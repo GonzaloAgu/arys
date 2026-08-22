@@ -37,12 +37,12 @@ Strict bootstrap keeps PR 1 atomic; user must accept its size before apply.
 
 ## Phase 3: Atomic Bootstrap Commit (after Phases 1–2)
 
-- [ ] 3.1 Run `register.ps1 -Pdf bibliografia/unidad-01-conceptos-de-seguridad.pdf`; manifest has 2 ordinal-sorted LF lines, hex first byte.
-- [ ] 3.2 Stage `integrity/manifest.sha256` — completes stage→register→stage.
-- [ ] 3.3 Activate hooks: `git config core.hooksPath .githooks`.
-- [ ] 3.4 Negative probe: unstage MD, attempt commit ⇒ rejected exit 1; restage MD.
-- [ ] 3.5 Bootstrap commit #1 (all seven files) accepted by active hook on empty HEAD.
-- [ ] 3.6 Sanity: `sha256sum -c integrity/manifest.sha256` exits 0; root commit has all seven.
+- [x] 3.1 Run `register.ps1 -Pdf bibliografia/unidad-01-conceptos-de-seguridad.pdf`; manifest has 2 ordinal-sorted LF lines, hex first byte.
+- [x] 3.2 Stage `integrity/manifest.sha256` — completes stage→register→stage.
+- [x] 3.3 Activate hooks: `git config core.hooksPath .githooks`.
+- [x] 3.4 Negative probe: unstage MD, attempt commit ⇒ rejected exit 1; restage MD.
+- [x] 3.5 Bootstrap commit #1 (all seven files) accepted by active hook on empty HEAD.
+- [x] 3.6 Sanity: `sha256sum -c integrity/manifest.sha256` exits 0; root commit has all seven.
 
 ## Phase 4: Sandbox Test Harness (after 3.5; under `tools/integrity/tests/`)
 
