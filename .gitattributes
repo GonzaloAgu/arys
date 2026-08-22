@@ -2,4 +2,4 @@
 *.md                       text eol=lf
 integrity/manifest.sha256  text eol=lf
 .githooks/pre-commit       text eol=lf
-tools/integrity/*.ps1      text eol=lf
+tools/integrity/**/*.ps1    text eol=lf
