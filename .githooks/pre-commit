@@ -1,0 +1,5 @@
+#!/bin/sh
+# Integrity pre-commit gate (D5): thin POSIX-sh shim delegating to the
+# PowerShell verifier so all enforcement logic stays versioned and testable.
+# Exit codes: 0 = pass, 1 = policy violation, 2 = broken machinery.
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "tools/integrity/verify.ps1"

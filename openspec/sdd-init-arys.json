@@ -1,0 +1,58 @@
+{
+  "project": "arys",
+  "initialized_at": "2026-08-21T16:04:00Z",
+  "workspace": "C:\\Users\\gonza\\arys",
+  "session_preflight": {
+    "execution_mode": "interactive",
+    "artifact_store": "openspec",
+    "delivery_strategy": "ask-on-risk",
+    "review_budget_lines": 400
+  },
+  "detection": {
+    "stack": {
+      "language": "unknown",
+      "framework": "unknown",
+      "runtime": "unknown",
+      "package_manager": "none"
+    },
+    "structure": {
+      "has_code": false,
+      "top_level_dirs": [".atl"],
+      "note": "Empty project — no source code, no build config, no tests detected."
+    },
+    "architecture": {
+      "pattern": "none",
+      "note": "No code present to detect architecture patterns."
+    },
+    "conventions": {
+      "naming": "none detected",
+      "import_style": "none detected",
+      "error_handling": "none detected"
+    },
+    "testing": {
+      "has_tests": false,
+      "test_framework": "none",
+      "test_command": "none",
+      "strict_tdd_feasible": false,
+      "note": "No test infrastructure detected. Strict TDD can be established once the stack is chosen."
+    }
+  },
+  "status": "partial",
+  "executive_summary": "Fresh empty project at arys with no source code, build configuration, or test infrastructure. Only a .atl/ directory with a skill registry exists. Stack selection, architecture decisions, and testing setup are all pending. SDD can proceed with exploration and proposal phases to establish the foundation.",
+  "next_recommended": "explore",
+  "risks": [
+    {
+      "severity": "info",
+      "message": "Project is empty — all stack/architecture decisions are open."
+    },
+    {
+      "severity": "info",
+      "message": "No test runner detected — testing capability will need to be established."
+    }
+  ],
+  "skill_resolution": {
+    "registry_loaded": true,
+    "matched_skills": [],
+    "note": "Skill registry loaded from .atl/skill-registry.md. No project-specific skills matched (empty project)."
+  }
+}
