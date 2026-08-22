@@ -147,7 +147,7 @@ function Parse-ManifestBytes {
     $map = New-Object System.Collections.Specialized.OrderedDictionary
     $prevPath = ''
     foreach ($line in $lines) {
-        if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
+        if ($line -cnotmatch '^([0-9a-f]{64})  (.+)$') {
             Exit-Broken "${Origin}: malformed line '$line' (expected '<64-hex>  <path>')."
         }
         $hash = $Matches[1]

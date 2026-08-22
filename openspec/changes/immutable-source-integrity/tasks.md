@@ -46,17 +46,17 @@ Strict bootstrap keeps PR 1 atomic; user must accept its size before apply.
 
 ## Phase 4: Sandbox Test Harness (after 3.5; under `tools/integrity/tests/`)
 
-- [ ] 4.1 Create `run-integrity-tests.ps1`: temp sandbox clones, active hooks, stage/commit helpers capturing exit codes.
-- [ ] 4.2 Unit tests: parser accepts `<hex64>␣␣<path>`, rejects malformed; ordinal-sort determinism; BOM-free LF round-trip.
-- [ ] 4.3 Blocking tests (exit 1): modified registered source names file; unregistered protected addition; unpaired new PDF + orphan-MD symmetric check.
-- [ ] 4.4 Blocking tests (exit 1): deletion keeping entry; half-pair deletion; manifest-line tampering (modified/removed).
-- [ ] 4.5 Bootstrap tests: compliant initial commit accepted; initial commit missing counterpart rejected.
-- [ ] 4.6 Behavior tests: paired-registration exits 0; worktree noise ignored; malformed manifest ⇒ 2; missing verifier ⇒ 2; outside-repo aborts.
-- [ ] 4.7 Integrity tests: cmd-pipe PDF hash matches reference byte-for-byte; CRLF-corrupted verifier fails closed.
-- [ ] 4.8 Helper tests: appends exactly two lines, prior lines byte-identical; refuses unpaired PDF, registered-path mutation, unstaged inputs.
+- [x] 4.1 Create `run-integrity-tests.ps1`: temp sandbox clones, active hooks, stage/commit helpers capturing exit codes.
+- [x] 4.2 Unit tests: parser accepts `<hex64>␣␣<path>`, rejects malformed; ordinal-sort determinism; BOM-free LF round-trip.
+- [x] 4.3 Blocking tests (exit 1): modified registered source names file; unregistered protected addition; unpaired new PDF + orphan-MD symmetric check.
+- [x] 4.4 Blocking tests (exit 1): deletion keeping entry; half-pair deletion; manifest-line tampering (modified/removed).
+- [x] 4.5 Bootstrap tests: compliant initial commit accepted; initial commit missing counterpart rejected.
+- [x] 4.6 Behavior tests: paired-registration exits 0; worktree noise ignored; malformed manifest ⇒ 2; missing verifier ⇒ 2; outside-repo aborts.
+- [x] 4.7 Integrity tests: cmd-pipe PDF hash matches reference byte-for-byte; CRLF-corrupted verifier fails closed.
+- [x] 4.8 Helper tests: appends exactly two lines, prior lines byte-identical; refuses unpaired PDF, registered-path mutation, unstaged inputs.
 
 ## Phase 5: E2E Verification
 
-- [ ] 5.1 Fresh clone (`core.autocrlf=true`): README steps activate hooks; compliant commit passes; `sha256sum -c` exits 0; no casing variants; entries match blobs.
-- [ ] 5.2 Map every delta-spec Given/When/Then scenario to passing evidence; log gaps for sdd-verify.
-- [ ] 5.3 Sandbox rollback rehearsal: remove machinery paths, unset `core.hooksPath` → plain-source tree restored.
+- [x] 5.1 Fresh clone (`core.autocrlf=true`): README steps activate hooks; compliant commit passes; `sha256sum -c` exits 0; no casing variants; entries match blobs.
+- [x] 5.2 Map every delta-spec Given/When/Then scenario to passing evidence; log gaps for sdd-verify.
+- [x] 5.3 Sandbox rollback rehearsal: remove machinery paths, unset `core.hooksPath` → plain-source tree restored.
