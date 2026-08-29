@@ -251,11 +251,11 @@ function New-SandboxScratch { # Empty repo (zero commits) for bootstrap scenario
 }
 
 function Invoke-Register {
-    param([string]$RepoDir, [string]$PdfPath)
+    param([string]$RepoDir, [string]$SourcePath)
     $prev = (Get-Location).Path
     Set-Location -LiteralPath $RepoDir
     try {
-        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'tools/integrity/register.ps1' -Pdf $PdfPath 2>&1
+        $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'tools/integrity/register.ps1' -Source $SourcePath 2>&1
         return @{ Code = [int]$LASTEXITCODE; Output = [string[]]@($out | ForEach-Object { [string]$_ }) }
     }
     finally {
@@ -335,7 +335,7 @@ function Invoke-SortAppendTests {
     Test-Assert 'sort-01 baseline manifest has two entries' (2 -eq $baseline.Count) "count=$($baseline.Count)"
 
     Add-SandboxPairFiles -RepoDir $sb -Stem 'aaaa-second'
-    $r = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/aaaa-second.pdf'
+    $r = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/aaaa-second.pdf'
     Test-Assert 'sort-02 register new pair exits 0' (0 -eq $r.Code) ($r.Output -join ' | ')
 
     [string[]]$afterFirst = @(Get-ManifestLines -RepoDir $sb)
@@ -346,7 +346,7 @@ function Invoke-SortAppendTests {
     Test-Assert 'sort-03 append: +2 lines, prior byte-identical, ordinal-sorted' $hygiene "lines=$($afterFirst.Count)"
 
     Add-SandboxPairFiles -RepoDir $sb -Stem 'zzz-third'
-    $r = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/zzz-third.pdf'
+    $r = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/zzz-third.pdf'
     Test-Assert 'sort-04 register second pair exits 0' (0 -eq $r.Code) ($r.Output -join ' | ')
 
     [string[]]$afterSecond = @(Get-ManifestLines -RepoDir $sb)
@@ -366,11 +366,11 @@ function Copy-MachineryIntoScratch {
 function Invoke-BootstrapTests {
     param([string]$ParentDir)
 
-    # boot-01: strict bootstrap — compliant initial commit accepted on empty HEAD.
+    # boot-01: strict bootstrap â€” compliant initial commit accepted on empty HEAD.
     $sb = New-SandboxScratch -ParentDir $ParentDir -Name 'boot-ok'
     Copy-MachineryIntoScratch -ScratchDir $sb
     Add-SandboxPairFiles -RepoDir $sb -Stem 'alpha-guide'
-    $reg = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/alpha-guide.pdf'
+    $reg = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/alpha-guide.pdf'
     $null = Invoke-Git -RepoDir $sb -GitArgs @('add', '--', 'integrity/manifest.sha256')
     Activate-SandboxHooks -RepoDir $sb
     $r = Invoke-Commit -RepoDir $sb -Message 'bootstrap compliant pair'
@@ -486,7 +486,7 @@ function Invoke-FreshCloneTests {
 
     # legal-01..03: compliant paired registration accepted on a fresh clone.
     Add-SandboxPairFiles -RepoDir $sb -Stem 'alpha-guide'
-    $reg = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/alpha-guide.pdf'
+    $reg = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/alpha-guide.pdf'
     $null = Invoke-Git -RepoDir $sb -GitArgs @('add', '--', 'integrity/manifest.sha256')
     $r = Invoke-Commit -RepoDir $sb -Message 'register alpha-guide pair'
     [string]$commitOut = ($r.Output -join ' | ')
@@ -524,7 +524,7 @@ function Invoke-FailClosedTests {
     Assert-RejectedCommit -Name 'closed-01 malformed manifest aborts commit' -Result (Invoke-Commit -RepoDir $sb -Message 'corrupt registry') -ExpectCode 1 -Fragment 'fail-closed'
     Test-Assert 'closed-02 no commit created on broken machinery' ((Get-HeadOid -RepoDir $sb) -eq $headBefore) 'HEAD advanced despite fail-closed abort'
 
-    # closed-05: shim contract — verifier exit code passes through exec unchanged
+    # closed-05: shim contract â€” verifier exit code passes through exec unchanged
     # (2 here); git maps any hook failure to its own exit 1 (see closed-01).
     if (-not (Get-Command 'sh.exe' -ErrorAction SilentlyContinue)) { throw 'sh.exe unavailable for shim probe' }
     Push-Location -LiteralPath $sb
@@ -552,7 +552,7 @@ function Invoke-FailClosedTests {
     Test-Assert 'closed-04 verifier outside repo exits 2' ((2 -eq $code) -and $joinedOut.Contains('not inside')) "exit=$code; out=$joinedOut"
 
     # closed-06 (task 4.7): corrupted registry DATA fails closed. A plain CRLF
-    # edit cannot reach the index (the eol=lf pin normalizes on add — verified),
+    # edit cannot reach the index (the eol=lf pin normalizes on add â€” verified),
     # so plant CR bytes directly via plumbing, the filter-bypassing tamper path.
     $sb3 = New-SandboxClone -ParentDir $ParentDir -Name 'closed-c'
     [string]$headBefore3 = Get-HeadOid -RepoDir $sb3
@@ -574,26 +574,26 @@ function Invoke-HelperRefusalTests {
     # helper-01/02: unstaged inputs refused; manifest bytes untouched.
     Write-SandboxBytes -Path (Join-Path $sb 'bibliografia\epsilon-five.pdf') -Bytes (New-FakePdfBytes -Stem 'epsilon-five')
     Write-SandboxText -Path (Join-Path $sb 'apuntes\epsilon-five.md') -Text (New-SandboxMarkdown -Stem 'epsilon-five')
-    $r = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/epsilon-five.pdf'
+    $r = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/epsilon-five.pdf'
     [bool]$ok = (1 -eq $r.Code) -and ((($r.Output -join ' | ')).Contains('is not staged')) -and ($baselineB64 -eq [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb)))
     Test-Assert 'helper-01 unstaged inputs refused, manifest untouched' $ok "exit=$($r.Code); out=$(($r.Output -join ' | '))"
 
     # helper-03/04: already-registered paths refused (append-only, no mutation).
-    $r = Invoke-Register -RepoDir $sb -PdfPath "bibliografia/$StemBase.pdf"
+    $r = Invoke-Register -RepoDir $sb -SourcePath "bibliografia/$StemBase.pdf"
     [bool]$ok2 = (1 -eq $r.Code) -and ((($r.Output -join ' | ')).Contains('append-only')) -and ($baselineB64 -eq [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb)))
     Test-Assert 'helper-02 registered-path mutation refused, manifest untouched' $ok2 "exit=$($r.Code); out=$(($r.Output -join ' | '))"
 
     # helper-05: PDF staged but its Markdown missing from staging refused.
     Write-SandboxBytes -Path (Join-Path $sb 'bibliografia\zeta-six.pdf') -Bytes (New-FakePdfBytes -Stem 'zeta-six')
     $null = Invoke-Git -RepoDir $sb -GitArgs @('add', '--', 'bibliografia/zeta-six.pdf')
-    $r = Invoke-Register -RepoDir $sb -PdfPath 'bibliografia/zeta-six.pdf'
+    $r = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/zeta-six.pdf'
     [bool]$ok3 = (1 -eq $r.Code) -and ((($r.Output -join ' | ')).Contains('is not staged'))
     Test-Assert 'helper-03 unpaired staged pdf refused' $ok3 "exit=$($r.Code); out=$(($r.Output -join ' | '))"
 }
 
 function Invoke-RollbackRehearsal {
     # Task 5.3: rehearse README's documented rollback exactly as written:
-    # remove machinery paths, unset core.hooksPath — plain-source tree restored.
+    # remove machinery paths, unset core.hooksPath â€” plain-source tree restored.
     param([string]$ParentDir)
 
     $sb = New-SandboxClone -ParentDir $ParentDir -Name 'rollback'

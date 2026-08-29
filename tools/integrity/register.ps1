@@ -1,20 +1,25 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Additions-only registration of a PDF + Markdown pair into the source manifest.
+    Additions-only registration of a protected source + Markdown pair into the
+    source manifest, for a PDF (bibliografia/*.pdf) or a web link (*.txt).
 
 .DESCRIPTION
     Workflow (stage -> register -> stage):
-      1. Stage BOTH files:   git add bibliografia/<stem>.pdf apuntes/<stem>.md
+      1. Stage BOTH files:   git add bibliografia/<stem>.pdf|.txt apuntes/<stem>.md
       2. Register the pair:  powershell -NoProfile -ExecutionPolicy Bypass `
                                 -File tools/integrity/register.ps1 `
-                                -Pdf bibliografia/<stem>.pdf
+                                -Source bibliografia/<stem>.txt
       3. Restage manifest:   git add integrity/manifest.sha256
       4. Commit.
 
+    Web links (*.txt) must contain exactly one line holding a single absolute
+    http(s):// URL; the URL is validated over the staged blob only.
+
     Refuses to run unless:
-      - the given PDF is staged under bibliografia/ with a [a-z0-9-]+ stem,
+      - the given source is staged under bibliografia/ with a [a-z0-9-]+ stem,
       - its mirrored Markdown apuntes/<same-stem>.md is also staged,
+      - no other source (PDF or web) already uses that stem,
       - neither path is already registered (append-only; no mutation, no re-baseline).
 
     Hashes are taken from STAGED blob oids only (never working-tree bytes), so
@@ -26,7 +31,7 @@
 
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Pdf
+    [string]$Source
 )
 
 Set-StrictMode -Version 2.0
@@ -163,6 +168,14 @@ foreach ($line in $lines) {
     return $map
 }
 
+# 'pdf' | 'txt' | $null  — the single extension classifier for protected sources.
+function Get-SourceKind {
+    param([string]$Path)
+    if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.pdf')) { return 'pdf' }
+    if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.txt')) { return 'txt' }
+    return $null
+}
+
 # ------------------------------------------------------------------ main ----
 
 $repoRoot = Resolve-RepoRoot
@@ -171,22 +184,23 @@ Set-Location -LiteralPath $repoRoot
 $shaTool = Resolve-Sha256Sum
 if ($null -eq $shaTool) { Exit-Broken 'sha256sum.exe was not found.' }
 
-# --- normalize and validate the requested PDF path ---------------------------
-$pdfPath = ($Pdf -replace '\\', '/').Trim()
-while ($pdfPath.StartsWith('./')) { $pdfPath = $pdfPath.Substring(2) }
+# --- normalize and validate the requested source path ------------------------
+$sourcePath = ($Source -replace '\\', '/').Trim()
+while ($sourcePath.StartsWith('./')) { $sourcePath = $sourcePath.Substring(2) }
 
-if (-not $pdfPath.StartsWith('bibliografia/') -or -not $pdfPath.EndsWith('.pdf')) {
-    Exit-Refuse "source must be a staged PDF under bibliografia/: '$pdfPath'."
+$kind = Get-SourceKind $sourcePath
+if ($null -eq $kind) {
+    Exit-Refuse "source must be a staged PDF or web link under bibliografia/ (.pdf or .txt): '$sourcePath'."
 }
-$stem = $pdfPath.Substring(13, $pdfPath.Length - 17)   # strip bibliografia/ and .pdf
+$stem = $sourcePath.Substring(13, $sourcePath.Length - 17)   # strip bibliografia/ and .pdf|.txt
 foreach ($segment in ($stem -split '/')) {
     if ($segment -notmatch '^[a-z0-9-]+$') {
-        Exit-Refuse "invalid stem '$segment' in '$pdfPath'; allowed characters are [a-z0-9-]."
+        Exit-Refuse "invalid stem '$segment' in '$sourcePath'; allowed characters are [a-z0-9-]."
     }
 }
 $mdPath = 'apuntes/' + $stem + '.md'
 
-Write-Msg "[register] Pair: $pdfPath <-> $mdPath"
+Write-Msg "[register] Pair: $sourcePath <-> $mdPath"
 
 # --- enumerate staged index over the protected roots -------------------------
 $index = New-Object System.Collections.Specialized.OrderedDictionary  # path -> oid
@@ -202,9 +216,9 @@ foreach ($entryLine in $lsOut) {
 }
 
 # --- both members must already be staged -------------------------------------
-foreach ($required in @($pdfPath, $mdPath)) {
+foreach ($required in @($sourcePath, $mdPath)) {
     if (-not $index.Contains($required)) {
-        Exit-Refuse "'$required' is not staged. Stage both files first: git add '$pdfPath' '$mdPath'"
+        Exit-Refuse "'$required' is not staged. Stage both files first: git add '$sourcePath' '$mdPath'"
     }
 }
 
@@ -225,20 +239,47 @@ else {
 }
 
 # --- append-only guarantee: both lines must be absent ------------------------
-foreach ($existing in @($pdfPath, $mdPath)) {
+foreach ($existing in @($sourcePath, $mdPath)) {
     if ($baseMap.Contains($existing)) {
         Exit-Refuse "'$existing' already has a manifest entry; the registry is append-only."
     }
 }
 
-# --- hash the STAGED blobs (D6) ------------------------------------------------
-$pdfHash = Get-StagedBlobHash $index[$pdfPath]
+# --- cross-kind stem check: at most one source (PDF or web) per stem ----------
+foreach ($sibling in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")) {
+    if ($sibling -eq $sourcePath) { continue }
+    if ($baseMap.Contains($sibling)) {
+        Exit-Refuse "stem '$stem' already has registered source '$sibling'; one source per stem is allowed."
+    }
+    if ($index.Contains($sibling)) {
+        Exit-Refuse "stem '$stem' collides with staged source '$sibling'; one source per stem is allowed."
+    }
+}
+
+# --- URL check (web links only), over the STAGED blob -------------------------
+if ($kind -eq 'txt') {
+    $linkBytes = Read-BlobBytesViaCmd $index[$sourcePath]        # staged blob ONLY
+    if ($null -eq $linkBytes) { Exit-Broken "failed to read staged link blob for '$sourcePath'." }
+    if ($linkBytes.Length -ge 3 -and $linkBytes[0] -eq 0xEF -and $linkBytes[1] -eq 0xBB -and $linkBytes[2] -eq 0xBF) {
+        Exit-Refuse "'$sourcePath' must be BOM-free UTF-8 text; link validation failed."
+    }
+    foreach ($b in $linkBytes) { if ($b -eq 13) { Exit-Refuse "'$sourcePath' must use LF line endings." } }
+    $text = [System.Text.Encoding]::UTF8.GetString($linkBytes)   # bytes already filtered; non-strict decode is safe
+    $lines = @($text -split "`n")
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines = @($lines[0..($lines.Count - 2)]) }
+    if ($lines.Count -ne 1 -or $lines[0] -notmatch '^https?://\S+$') {
+        Exit-Refuse "'$sourcePath' must contain exactly one line with a single absolute http(s):// URL."
+    }
+}
+
+# --- hash the STAGED blobs ------------------------------------------------------
+$sourceHash = Get-StagedBlobHash $index[$sourcePath]
 $mdHash = Get-StagedBlobHash $index[$mdPath]
 
 # --- rebuild the manifest deterministically -----------------------------------
 $newMap = New-Object System.Collections.Specialized.OrderedDictionary
 foreach ($key in $baseMap.Keys) { $newMap[$key] = $baseMap[$key] }
-$newMap[$pdfPath] = $pdfHash
+$newMap[$sourcePath] = $sourceHash
 $newMap[$mdPath] = $mdHash
 
 # Append-only guarantee: every pre-existing entry must be carried over verbatim.
@@ -274,7 +315,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Msg "[register] Appended 2 manifest line(s):"
-Write-Msg "[register]   $pdfHash  $pdfPath"
+Write-Msg "[register]   $sourceHash  $sourcePath"
 Write-Msg "[register]   $mdHash  $mdPath"
 Write-Msg "[register] Manifest rewritten ($($newMap.Count) entries, ordinal-sorted, LF, no BOM) and restaged."
 exit 0
