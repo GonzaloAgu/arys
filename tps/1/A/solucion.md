@@ -93,3 +93,24 @@ El valor `600` en `chmod` significa: dueño = lectura (4) + escritura (2) = 6; g
 Esto aporta a la confidencialidad porque impide que otros usuarios lean el contenido, y aporta a la integridad porque impide que otros lo modifiquen sin autorización. Se relaciona con el principio de **menor privilegio**: cada usuario recibe solo los permisos que necesita, minimizando la superficie de ataque.
 
 > **Fuente:** Elementos del control de acceso: "Autorización: son los permisos asociados al usuario autenticado" (apuntes §Amenazas en el control de acceso). Menor privilegio: "cada usuario o proceso recibe solo los permisos que necesita. Es, probablemente, el principio más rentable" (apuntes §6).
+
+### B.4 Disponibilidad — el backup que se prueba
+
+Se simuló la pérdida del archivo original y su restauración desde un backup.
+
+**Código ejecutado:**
+
+```bash
+cp orden.txt orden.bak
+rm orden.txt              # "perdimos" el original
+cp orden.bak orden.txt    # restauramos
+cat orden.txt
+```
+
+**Respuesta:**
+
+El backup protege el pilar de **disponibilidad**: garantiza que la información esté accesible cuando se la necesita, incluso ante la pérdida del original. Sin embargo, un backup que nunca se restauró no cuenta como control efectivo, porque no hay garantía de que funcione cuando se lo necesite. Podría estar corrupto, incompleto o desactualizado.
+
+La regla **3-2-1** (que veremos en la Unidad 2) establece: mantener **3** copias de los datos, en **2** medios diferentes, con **1** copia fuera del sitio. Esto asegura que si un evento destruye una copia (incendio, robo, fallo de disco), siempre exista al menos una alternativa accesible y funcional.
+
+> **Fuente:** "Se vulnera cuando algo no está (un servidor caído, un ataque de denegación de servicio, un backup que nunca se probó). Se protege con redundancia, backups, balanceo de carga y mantenimiento." (apuntes §2.3 – Disponibilidad).
