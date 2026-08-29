@@ -157,6 +157,11 @@ class DocxBuilder:
                 table.rows[r_idx + 1].cells[c_idx].text = val
         return self
 
+    def add_image(self, path: str | Path, width: Cm = Cm(15)):
+        """Agrega una imagen al documento."""
+        self.doc.add_picture(str(path), width=width)
+        return self
+
     def save(self, path: str | Path):
         """Guarda el documento en la ruta indicada."""
         path = Path(path)
