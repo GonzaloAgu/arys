@@ -238,13 +238,6 @@ else {
     }
 }
 
-# --- append-only guarantee: both lines must be absent ------------------------
-foreach ($existing in @($sourcePath, $mdPath)) {
-    if ($baseMap.Contains($existing)) {
-        Exit-Refuse "'$existing' already has a manifest entry; the registry is append-only."
-    }
-}
-
 # --- cross-kind stem check: at most one source (PDF or web) per stem ----------
 foreach ($sibling in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")) {
     if ($sibling -eq $sourcePath) { continue }
@@ -253,6 +246,13 @@ foreach ($sibling in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")) {
     }
     if ($index.Contains($sibling)) {
         Exit-Refuse "stem '$stem' collides with staged source '$sibling'; one source per stem is allowed."
+    }
+}
+
+# --- append-only guarantee: both lines must be absent ------------------------
+foreach ($existing in @($sourcePath, $mdPath)) {
+    if ($baseMap.Contains($existing)) {
+        Exit-Refuse "'$existing' already has a manifest entry; the registry is append-only."
     }
 }
 
