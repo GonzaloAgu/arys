@@ -64,4 +64,4 @@ Single PR fits the 800-line session budget. Authored lines sit near the 400-line
 
 - [x] 6.1 README: web-source layout row, `-Source` register flow, web delete flow, URL-rot disclosure (proposal risk mitigation).
 - [x] 6.2 Full runner: 51 existing + 16 new = 67 pass; `sha256sum -c integrity/manifest.sha256` exits 0 on `core.autocrlf=true` fresh clone (proposal success criteria).
-- [ ] 6.3 Map all 22 delta-spec scenarios (web-source-layout 5, source-manifest 8, integrity-pre-commit-hook 9) to passing evidence; log gaps for sdd-verify.
+- [x] 6.3 Map all 22 delta-spec scenarios (web-source-layout 5, source-manifest 8, integrity-pre-commit-hook 9) to passing evidence; log gaps for sdd-verify — verified 22/22 covered, 0 gaps (sdd-verify report).
