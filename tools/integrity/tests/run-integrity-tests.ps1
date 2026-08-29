@@ -210,6 +210,22 @@ function Add-SandboxPairFiles { # Writes deterministic pair into sandbox and sta
     if (0 -ne $r.Code) { throw ("staging pair failed in ${RepoDir}: " + ($r.Output -join '; ')) }
 }
 
+function New-SandboxWebPair { # Writes a web-link source + mirror into sandbox and stages both.
+    param([string]$RepoDir, [string]$Stem, [string]$Url)
+    Write-SandboxText -Path (Join-Path $RepoDir "bibliografia\$Stem.txt") -Text ("$Url`n")
+    Write-SandboxText -Path (Join-Path $RepoDir "apuntes\$Stem.md") -Text (New-SandboxMarkdown -Stem $Stem)
+    $r = Invoke-Git -RepoDir $RepoDir -GitArgs @('add', '--', "bibliografia/$Stem.txt", "apuntes/$Stem.md")
+    if (0 -ne $r.Code) { throw ("staging web pair failed in ${RepoDir}: " + ($r.Output -join '; ')) }
+}
+
+function New-SandboxWebPairBytes { # Writes a web pair with explicit raw txt bytes and stages both.
+    param([string]$RepoDir, [string]$Stem, [byte[]]$TxtBytes)
+    Write-SandboxBytes -Path (Join-Path $RepoDir "bibliografia\$Stem.txt") -Bytes $TxtBytes
+    Write-SandboxText -Path (Join-Path $RepoDir "apuntes\$Stem.md") -Text (New-SandboxMarkdown -Stem $Stem)
+    $r = Invoke-Git -RepoDir $RepoDir -GitArgs @('add', '--', "bibliografia/$Stem.txt", "apuntes/$Stem.md")
+    if (0 -ne $r.Code) { throw ("staging web pair (bytes) failed in ${RepoDir}: " + ($r.Output -join '; ')) }
+}
+
 function Configure-SandboxRepo { # Identity only; EOL policy is decided per scenario.
     param([string]$RepoDir)
     $null = Invoke-Git -RepoDir $RepoDir -GitArgs @('config', 'user.name', 'Integrity Harness')
@@ -325,6 +341,161 @@ function Invoke-ParserUnitTests {
         }
         Test-Assert $case.Name $ok $detail
     }
+}
+
+$script:MirrorChildTemplate = @'
+param([Parameter(Mandatory)][string]$VerifyScript, [Parameter(Mandatory)][string]$Path)
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($VerifyScript, [ref]$tokens, [ref]$errors)
+if ($null -ne $errors -and $errors.Count -gt 0) { [Console]::Out.WriteLine('PARSE_ERRORS'); exit 3 }
+$funcs = @($ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+foreach ($f in $funcs) { . ([scriptblock]::Create($f.Extent.Text)) }
+$kind = Get-SourceKind -Path $Path
+if ($null -eq $kind) { [Console]::Out.WriteLine('KIND=null') } else { [Console]::Out.WriteLine('KIND=' + $kind) }
+$cands = @(Get-MirrorCandidates -Path $Path)
+[Console]::Out.WriteLine('CANDIDATES=' + ($cands -join ','))
+exit 0
+'@
+
+function Invoke-MirrorCase {
+    param([string]$ChildScript, [string]$Path)
+    $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ChildScript -VerifyScript (Join-Path $script:RepoRoot 'tools\integrity\verify.ps1') -Path $Path 2>&1
+    return @{ Code = [int]$LASTEXITCODE; Output = [string[]]@($out | ForEach-Object { [string]$_ }) }
+}
+
+function Invoke-MirrorUnitTests {
+    param([string]$ChildScript)
+
+    $cases = @(
+        @{ Name = 'mirror-01 pdf source maps to apuntes/<stem>.md'; Path = 'bibliografia/unidad-01-conceptos-de-seguridad.pdf'; Kind = 'pdf'; Cand = 'apuntes/unidad-01-conceptos-de-seguridad.md' },
+        @{ Name = 'mirror-02 txt source maps to apuntes/<stem>.md'; Path = 'bibliografia/unidad-01-teoria-web.txt'; Kind = 'txt'; Cand = 'apuntes/unidad-01-teoria-web.md' },
+        @{ Name = 'mirror-03 apuntes/<stem>.md maps to both source candidates'; Path = 'apuntes/unidad-01-teoria-web.md'; Kind = 'null'; Cand = 'bibliografia/unidad-01-teoria-web.pdf,bibliografia/unidad-01-teoria-web.txt' },
+        @{ Name = 'mirror-04 non-pairable path maps to empty set'; Path = 'apuntes/extra-notes.txt'; Kind = 'null'; Cand = '' }
+    )
+    foreach ($case in $cases) {
+        $r = Invoke-MirrorCase -ChildScript $ChildScript -Path $case.Path
+        $kindLine = [string](@($r.Output | Where-Object { $_.StartsWith('KIND=') }) | Select-Object -First 1)
+        $candLine = [string](@($r.Output | Where-Object { $_.StartsWith('CANDIDATES=') }) | Select-Object -First 1)
+        [bool]$ok = ($null -ne $kindLine -and $kindLine -eq ('KIND=' + $case.Kind)) -and ($candLine -eq ('CANDIDATES=' + $case.Cand))
+        Test-Assert $case.Name $ok "exit=$($r.Code); out=$(($r.Output -join ' | '))"
+    }
+}
+
+function Invoke-WebCategoryTests {
+    param([string]$ParentDir)
+
+    $webStem  = 'unidad-01-teoria-web'
+    $webTxt   = "bibliografia/$webStem.txt"
+    $webMd    = "apuntes/$webStem.md"
+    $webUrl   = 'https://bzappellini.github.io/ARyS/unidades/u01-conceptos-seguridad/teoria.md'
+
+    # Committed web-pair base: register via -Source and commit (hook accepts). This
+    # clone also hosts the web-05..09 scenarios via Reset-SandboxState between them.
+    $sbW = New-SandboxClone -ParentDir $ParentDir -Name 'webpair'
+    [string[]]$baseline = @(Get-ManifestLines -RepoDir $sbW)
+    New-SandboxWebPair -RepoDir $sbW -Stem $webStem -Url $webUrl
+    $r1 = Invoke-Register -RepoDir $sbW -SourcePath $webTxt
+    [string[]]$after = @(Get-ManifestLines -RepoDir $sbW)
+    [bool]$intact = $true
+    foreach ($line in $baseline) { if (@($after) -cnotcontains $line) { $intact = $false } }
+    [byte[]]$raw = Get-ManifestRawBytes -RepoDir $sbW
+    [bool]$hygiene = ($after.Count -eq 4) -and $intact -and (Test-OrdinalSortedLines -Lines $after) -and (-not (@($raw) -contains 13)) -and ($raw[$raw.Length - 1] -eq 10)
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
+    $c1 = Invoke-Commit -RepoDir $sbW -Message 'register web pair base'
+    [string]$c1out = ($c1.Output -join ' | ')
+    Test-Assert 'web-01 register web pair via -Source ok, prior lines byte-identical, ordinal' ((0 -eq $r1.Code) -and (0 -eq $c1.Code) -and $hygiene -and $c1out.Contains('[integrity] OK:')) "reg=$($r1.Code); commit=$($c1.Code); lines=$($after.Count); out=$c1out"
+
+    # web-02: link with no URL rejected; manifest untouched.
+    $sb2 = New-SandboxClone -ParentDir $ParentDir -Name 'web02'
+    [string]$base2 = [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb2))
+    New-SandboxWebPair -RepoDir $sb2 -Stem 'web-nourl' -Url ''
+    $r2 = Invoke-Register -RepoDir $sb2 -SourcePath 'bibliografia/web-nourl.txt'
+    [bool]$ok2 = (1 -eq $r2.Code) -and ((($r2.Output -join ' | ')).Contains('REFUSED')) -and ($base2 -eq [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb2)))
+    Test-Assert 'web-02 link without URL rejected, manifest untouched' $ok2 "exit=$($r2.Code); out=$(($r2.Output -join ' | '))"
+
+    # web-03: link with a non-http URL rejected; manifest untouched.
+    $sb3 = New-SandboxClone -ParentDir $ParentDir -Name 'web03'
+    [string]$base3 = [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb3))
+    New-SandboxWebPair -RepoDir $sb3 -Stem 'web-badurl' -Url 'ftp://example.com/x'
+    $r3 = Invoke-Register -RepoDir $sb3 -SourcePath 'bibliografia/web-badurl.txt'
+    [bool]$ok3 = (1 -eq $r3.Code) -and ((($r3.Output -join ' | ')).Contains('REFUSED')) -and ($base3 -eq [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sb3)))
+    Test-Assert 'web-03 link with invalid (non-http) URL rejected, manifest untouched' $ok3 "exit=$($r3.Code); out=$(($r3.Output -join ' | '))"
+
+    # web-04: unpaired web link blocked (manifest carries the txt line, no md staged).
+    $sb4 = New-SandboxClone -ParentDir $ParentDir -Name 'web04'
+    Write-SandboxText -Path (Join-Path $sb4 'bibliografia\web-solo.txt') -Text "https://example.com/solo`n"
+    $null = Invoke-Git -RepoDir $sb4 -GitArgs @('add', '--', 'bibliografia/web-solo.txt')
+    [string]$h4 = Get-DotNetSha256 -Bytes (Read-BlobBytes -RepoDir $sb4 -RevSpec (Get-StagedOid -RepoDir $sb4 -Path 'bibliografia/web-solo.txt'))
+    [string[]]$base4 = @(Get-ManifestLines -RepoDir $sb4)
+    Write-SandboxText -Path (Join-Path $sb4 'integrity\manifest.sha256') -Text ($base4[0] + "`n" + $base4[1] + "`n" + "$h4  bibliografia/web-solo.txt`n")
+    $null = Invoke-Git -RepoDir $sb4 -GitArgs @('add', '--', 'integrity/manifest.sha256')
+    Assert-RejectedCommit -Name 'web-04 unpaired web link blocked' -Result (Invoke-Commit -RepoDir $sb4 -Message 'stage lone web link') -ExpectCode 1 -Fragment 'unpaired web link'
+
+    # web-05: tampered registered link blocked.
+    [System.IO.File]::AppendAllText((Join-Path $sbW 'bibliografia\unidad-01-teoria-web.txt'), "tampered`n")
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', $webTxt)
+    Assert-RejectedCommit -Name 'web-05 modified registered link blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'tamper registered link') -ExpectCode 1 -Fragment 'content differs'
+    Reset-SandboxState -RepoDir $sbW
+
+    # web-06: tampered registered web markdown blocked.
+    [System.IO.File]::AppendAllText((Join-Path $sbW 'apuntes\unidad-01-teoria-web.md'), "`nTampered note.`n")
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', $webMd)
+    Assert-RejectedCommit -Name 'web-06 modified web markdown blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'tamper registered web note') -ExpectCode 1 -Fragment 'content differs'
+    Reset-SandboxState -RepoDir $sbW
+
+    # web-07: half-pair web deletion (link removed).
+    $res7 = $null
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('rm', '-q', '--', $webTxt)
+    $res7 = Invoke-Commit -RepoDir $sbW -Message 'half web deletion link'
+    [string]$j7 = ($res7.Output -join ' | ')
+    Test-Assert 'web-07 half-pair web deletion (link) blocked' ((1 -eq $res7.Code) -and $j7.Contains('half-pair deletion') -and $j7.Contains('together with its pair')) "exit=$($res7.Code); out=$j7"
+    Reset-SandboxState -RepoDir $sbW
+
+    # web-08: half-pair web deletion (markdown removed).
+    $res8 = $null
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('rm', '-q', '--', $webMd)
+    $res8 = Invoke-Commit -RepoDir $sbW -Message 'half web deletion md'
+    [string]$j8 = ($res8.Output -join ' | ')
+    Test-Assert 'web-08 half-pair web deletion (markdown) blocked' ((1 -eq $res8.Code) -and $j8.Contains('half-pair deletion') -and $j8.Contains('together with its pair')) "exit=$($res8.Code); out=$j8"
+    Reset-SandboxState -RepoDir $sbW
+
+    # web-09: atomic web-pair deletion ok, baseline restored.
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('rm', '-q', '--', $webTxt, $webMd)
+    [string]$kept9 = (@(Get-ManifestLines -RepoDir $sbW) | Where-Object { -not ($_.EndsWith($webTxt) -or $_.EndsWith($webMd)) }) -join "`n"
+    Write-SandboxText -Path (Join-Path $sbW 'integrity\manifest.sha256') -Text ($kept9 + "`n")
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
+    $res9 = Invoke-Commit -RepoDir $sbW -Message 'atomic deletion of web pair'
+    Test-Assert 'web-09 atomic web-pair deletion ok, baseline restored' ((0 -eq $res9.Code) -and (2 -eq @(Get-ManifestLines -RepoDir $sbW).Count)) "exit=$($res9.Code); lines=$(@(Get-ManifestLines -RepoDir $sbW).Count)"
+
+    # web-10: duplicate stem blocked by the hook when a sibling source is registered.
+    $sb10 = New-SandboxClone -ParentDir $ParentDir -Name 'web10'
+    Write-SandboxText -Path (Join-Path $sb10 "bibliografia\$StemBase.txt") -Text "https://example.com/dup`n"
+    $null = Invoke-Git -RepoDir $sb10 -GitArgs @('add', '--', "bibliografia/$StemBase.txt")
+    Assert-RejectedCommit -Name 'web-10 duplicate stem blocked (hook)' -Result (Invoke-Commit -RepoDir $sb10 -Message 'stage duplicate-stem link') -ExpectCode 1 -Fragment 'duplicate source stem'
+
+    # helper-04: register refuses a duplicate stem ("one source per stem").
+    $sbH = New-SandboxClone -ParentDir $ParentDir -Name 'helper4'
+    Write-SandboxText -Path (Join-Path $sbH "bibliografia\$StemBase.txt") -Text "https://example.com/dup`n"
+    $null = Invoke-Git -RepoDir $sbH -GitArgs @('add', '--', "bibliografia/$StemBase.txt")
+    [string]$baseH = [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sbH))
+    $rH = Invoke-Register -RepoDir $sbH -SourcePath "bibliografia/$StemBase.txt"
+    [bool]$okH = (1 -eq $rH.Code) -and ((($rH.Output -join ' | ')).Contains('one source per stem')) -and ($baseH -eq [Convert]::ToBase64String((Get-ManifestRawBytes -RepoDir $sbH)))
+    Test-Assert 'helper-04 register refuses duplicate stem one source per stem' $okH "exit=$($rH.Code); out=$(($rH.Output -join ' | '))"
+}
+
+function Invoke-EOLLinkTest {
+    param([string]$ParentDir)
+
+    # eol-01: .txt CRLF working-tree bytes normalize to LF in the staged blob.
+    $sb = New-SandboxClone -ParentDir $ParentDir -Name 'eol01'
+    [byte[]]$crlfBytes = [System.Text.Encoding]::UTF8.GetBytes("https://example.com/eol`r`n")
+    New-SandboxWebPairBytes -RepoDir $sb -Stem 'eol-link' -TxtBytes $crlfBytes
+    [string]$txtOid = Get-StagedOid -RepoDir $sb -Path 'bibliografia/eol-link.txt'
+    [byte[]]$blobBytes = Read-BlobBytes -RepoDir $sb -RevSpec $txtOid
+    [bool]$noCr = ($null -ne $blobBytes) -and (-not (@($blobBytes) -contains 13))
+    [byte[]]$lfFixture = [System.Text.Encoding]::UTF8.GetBytes("https://example.com/eol`n")
+    [bool]$hashEq = ($null -ne $blobBytes) -and ((Get-DotNetSha256 -Bytes $blobBytes) -ceq (Get-DotNetSha256 -Bytes $lfFixture))
+    Test-Assert 'eol-01 .txt CRLF normalized to LF in staged blob' ($noCr -and $hashEq) "noCr=$noCr hashEq=$hashEq"
 }
 
 function Invoke-SortAppendTests {
@@ -667,6 +838,13 @@ try {
     Write-SandboxText -Path $childScript -Text $script:ParserChildTemplate
 
     Invoke-ParserUnitTests -ScratchDir $tmpRoot -ChildScript $childScript
+
+    [string]$mirrorChild = Join-Path $tmpRoot 'mirror-child.ps1'
+    Write-SandboxText -Path $mirrorChild -Text $script:MirrorChildTemplate
+    Invoke-MirrorUnitTests -ChildScript $mirrorChild
+    Invoke-WebCategoryTests -ParentDir $tmpRoot
+    Invoke-EOLLinkTest -ParentDir $tmpRoot
+
     Invoke-SortAppendTests -ParentDir $tmpRoot
     Invoke-BootstrapTests -ParentDir $tmpRoot
     Invoke-BlockingTests -ParentDir $tmpRoot
