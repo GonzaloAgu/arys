@@ -443,20 +443,22 @@ function Invoke-WebCategoryTests {
     Assert-RejectedCommit -Name 'web-06 modified web markdown blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'tamper registered web note') -ExpectCode 1 -Fragment 'content differs'
     Reset-SandboxState -RepoDir $sbW
 
-    # web-07: half-pair web deletion (link removed).
-    $res7 = $null
+    # web-07: half-pair web deletion (link removed along with its manifest line;
+    # keeps the markdown + its line => check 5+6b "half-pair deletion").
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('rm', '-q', '--', $webTxt)
-    $res7 = Invoke-Commit -RepoDir $sbW -Message 'half web deletion link'
-    [string]$j7 = ($res7.Output -join ' | ')
-    Test-Assert 'web-07 half-pair web deletion (link) blocked' ((1 -eq $res7.Code) -and $j7.Contains('half-pair deletion') -and $j7.Contains('together with its pair')) "exit=$($res7.Code); out=$j7"
+    [string]$kept7 = (@(Get-ManifestLines -RepoDir $sbW) | Where-Object { -not $_.EndsWith($webTxt) }) -join "`n"
+    Write-SandboxText -Path (Join-Path $sbW 'integrity\manifest.sha256') -Text ($kept7 + "`n")
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
+    Assert-RejectedCommit -Name 'web-07 half-pair web deletion (link) blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'half web deletion link') -ExpectCode 1 -Fragment 'half-pair deletion'
     Reset-SandboxState -RepoDir $sbW
 
-    # web-08: half-pair web deletion (markdown removed).
-    $res8 = $null
+    # web-08: half-pair web deletion (markdown removed + its line dropped;
+    # keeps the link + its line => reverse-direction "half-pair deletion").
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('rm', '-q', '--', $webMd)
-    $res8 = Invoke-Commit -RepoDir $sbW -Message 'half web deletion md'
-    [string]$j8 = ($res8.Output -join ' | ')
-    Test-Assert 'web-08 half-pair web deletion (markdown) blocked' ((1 -eq $res8.Code) -and $j8.Contains('half-pair deletion') -and $j8.Contains('together with its pair')) "exit=$($res8.Code); out=$j8"
+    [string]$kept8 = (@(Get-ManifestLines -RepoDir $sbW) | Where-Object { -not $_.EndsWith($webMd) }) -join "`n"
+    Write-SandboxText -Path (Join-Path $sbW 'integrity\manifest.sha256') -Text ($kept8 + "`n")
+    $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
+    Assert-RejectedCommit -Name 'web-08 half-pair web deletion (markdown) blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'half web deletion md') -ExpectCode 1 -Fragment 'half-pair deletion'
     Reset-SandboxState -RepoDir $sbW
 
     # web-09: atomic web-pair deletion ok, baseline restored.
