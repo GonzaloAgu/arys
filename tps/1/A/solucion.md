@@ -114,3 +114,22 @@ El backup protege el pilar de **disponibilidad**: garantiza que la información 
 La regla **3-2-1** (que veremos en la Unidad 2) establece: mantener **3** copias de los datos, en **2** medios diferentes, con **1** copia fuera del sitio. Esto asegura que si un evento destruye una copia (incendio, robo, fallo de disco), siempre exista al menos una alternativa accesible y funcional.
 
 > **Fuente:** "Se vulnera cuando algo no está (un servidor caído, un ataque de denegación de servicio, un backup que nunca se probó). Se protege con redundancia, backups, balanceo de carga y mantenimiento." (apuntes §2.3 – Disponibilidad).
+
+---
+
+## Parte C — Del riesgo al control
+
+Se retoma el activo principal de la Parte A: **administración de directorios compartidos**. La amenaza identificada es el acceso no autorizado de un tercero, aprovechando la vulnerabilidad de contraseñas similares.
+
+| Control propuesto | Tipo | Pilar CIA protegido | Descripción |
+|-------------------|------|---------------------|-------------|
+| Política de contraseñas robustas + autenticación de dos factores (2FA) | Preventivo | Confidencialidad | Exige contraseñas únicas, complejas y rotativas, y añade un segundo factor de verificación. Ataca directamente la vulnerabilidad de contraseñas similares. |
+| Registro de auditoría (logs de acceso) | Detectivo | Integridad y Confidencialidad | Registra cada intento de acceso y acción sobre el directorio compartido. Permite detectar en tiempo real si alguien accedió o modificó archivos de forma no autorizada. |
+
+### Justificación — ¿Cuál implementar primero?
+
+Implementaría primero la **política de contraseñas robustas + 2FA** (preventivo). La razón es que ataca la raíz del problema: la vulnerabilidad de contraseñas similares. Un control preventivo detiene el incidente antes de que ocurra, mientras que un control detectivo solo alerta después de que ya ocurrió daño.
+
+En términos de costo vs. reducción de riesgo: una política de contraseñas no tiene costo tecnológico significativo (se puede implementar con configuración del sistema operativo), y la 2FA tiene costos bajos o gratuitos con herramientas como Google Authenticator. En cambio, un sistema de logs requiere infraestructura de monitoreo, almacenamiento de registros y revisión periódica para ser efectivo.
+
+> **Fuente:** "Un control (o salvaguarda) es toda medida que reduce el riesgo." Tipos: "Preventivo — antes del incidente (Firewall, cifrado, control de acceso)" / "Detectivo — durante el incidente (IDS, monitoreo, logs)" (apuntes §5 – Controles). Menor privilegio: "muchos incidentes graves empiezan con una cuenta que tenía más permisos de los necesarios" (apuntes §6).
