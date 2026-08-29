@@ -384,7 +384,10 @@ function Invoke-MirrorUnitTests {
 function Invoke-WebCategoryTests {
     param([string]$ParentDir)
 
-    $webStem  = 'unidad-01-teoria-web'
+    # NOTE: this sandbox stem deliberately differs from the real registered web
+    # pair (unidad-01-teoria-web) so a New-SandboxClone of the current repo does
+    # not already contain it, keeping web-01's registration non-colliding.
+    $webStem  = 'webdemo'
     $webTxt   = "bibliografia/$webStem.txt"
     $webMd    = "apuntes/$webStem.md"
     $webUrl   = 'https://bzappellini.github.io/ARyS/unidades/u01-conceptos-seguridad/teoria.md'
@@ -399,7 +402,7 @@ function Invoke-WebCategoryTests {
     [bool]$intact = $true
     foreach ($line in $baseline) { if (@($after) -cnotcontains $line) { $intact = $false } }
     [byte[]]$raw = Get-ManifestRawBytes -RepoDir $sbW
-    [bool]$hygiene = ($after.Count -eq 4) -and $intact -and (Test-OrdinalSortedLines -Lines $after) -and (-not (@($raw) -contains 13)) -and ($raw[$raw.Length - 1] -eq 10)
+    [bool]$hygiene = ($after.Count -eq ($baseline.Count + 2)) -and $intact -and (Test-OrdinalSortedLines -Lines $after) -and (-not (@($raw) -contains 13)) -and ($raw[$raw.Length - 1] -eq 10)
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
     $c1 = Invoke-Commit -RepoDir $sbW -Message 'register web pair base'
     [string]$c1out = ($c1.Output -join ' | ')
@@ -432,13 +435,13 @@ function Invoke-WebCategoryTests {
     Assert-RejectedCommit -Name 'web-04 unpaired web link blocked' -Result (Invoke-Commit -RepoDir $sb4 -Message 'stage lone web link') -ExpectCode 1 -Fragment 'unpaired web link'
 
     # web-05: tampered registered link blocked.
-    [System.IO.File]::AppendAllText((Join-Path $sbW 'bibliografia\unidad-01-teoria-web.txt'), "tampered`n")
+    [System.IO.File]::AppendAllText((Join-Path $sbW ($webTxt -replace '/', '\')), "tampered`n")
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', $webTxt)
     Assert-RejectedCommit -Name 'web-05 modified registered link blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'tamper registered link') -ExpectCode 1 -Fragment 'content differs'
     Reset-SandboxState -RepoDir $sbW
 
     # web-06: tampered registered web markdown blocked.
-    [System.IO.File]::AppendAllText((Join-Path $sbW 'apuntes\unidad-01-teoria-web.md'), "`nTampered note.`n")
+    [System.IO.File]::AppendAllText((Join-Path $sbW ($webMd -replace '/', '\')), "`nTampered note.`n")
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', $webMd)
     Assert-RejectedCommit -Name 'web-06 modified web markdown blocked' -Result (Invoke-Commit -RepoDir $sbW -Message 'tamper registered web note') -ExpectCode 1 -Fragment 'content differs'
     Reset-SandboxState -RepoDir $sbW
@@ -467,7 +470,7 @@ function Invoke-WebCategoryTests {
     Write-SandboxText -Path (Join-Path $sbW 'integrity\manifest.sha256') -Text ($kept9 + "`n")
     $null = Invoke-Git -RepoDir $sbW -GitArgs @('add', '--', 'integrity/manifest.sha256')
     $res9 = Invoke-Commit -RepoDir $sbW -Message 'atomic deletion of web pair'
-    Test-Assert 'web-09 atomic web-pair deletion ok, baseline restored' ((0 -eq $res9.Code) -and (2 -eq @(Get-ManifestLines -RepoDir $sbW).Count)) "exit=$($res9.Code); lines=$(@(Get-ManifestLines -RepoDir $sbW).Count)"
+    Test-Assert 'web-09 atomic web-pair deletion ok, baseline restored' ((0 -eq $res9.Code) -and ($baseline.Count -eq @(Get-ManifestLines -RepoDir $sbW).Count)) "exit=$($res9.Code); lines=$(@(Get-ManifestLines -RepoDir $sbW).Count)"
 
     # web-10: duplicate stem blocked by the hook when a sibling source is registered.
     $sb10 = New-SandboxClone -ParentDir $ParentDir -Name 'web10'
@@ -505,7 +508,7 @@ function Invoke-SortAppendTests {
 
     $sb = New-SandboxClone -ParentDir $ParentDir -Name 'sortappend'
     [string[]]$baseline = @(Get-ManifestLines -RepoDir $sb)
-    Test-Assert 'sort-01 baseline manifest has two entries' (2 -eq $baseline.Count) "count=$($baseline.Count)"
+    Test-Assert 'sort-01 baseline manifest has paired entries' (($baseline.Count -ge 2) -and (0 -eq ($baseline.Count % 2))) "count=$($baseline.Count)"
 
     Add-SandboxPairFiles -RepoDir $sb -Stem 'aaaa-second'
     $r = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/aaaa-second.pdf'
@@ -515,7 +518,7 @@ function Invoke-SortAppendTests {
     [bool]$intact = $true
     foreach ($line in $baseline) { if (@($afterFirst) -cnotcontains $line) { $intact = $false } }
     [byte[]]$raw = Get-ManifestRawBytes -RepoDir $sb
-    [bool]$hygiene = (($afterFirst.Count -eq 4) -and $intact -and (Test-OrdinalSortedLines -Lines $afterFirst) -and (($raw[0] -ge 48 -and $raw[0] -le 57) -or ($raw[0] -ge 97 -and $raw[0] -le 102)) -and (-not (@($raw) -contains 13)) -and ($raw[$raw.Length - 1] -eq 10))
+    [bool]$hygiene = (($afterFirst.Count -eq ($baseline.Count + 2)) -and $intact -and (Test-OrdinalSortedLines -Lines $afterFirst) -and (($raw[0] -ge 48 -and $raw[0] -le 57) -or ($raw[0] -ge 97 -and $raw[0] -le 102)) -and (-not (@($raw) -contains 13)) -and ($raw[$raw.Length - 1] -eq 10))
     Test-Assert 'sort-03 append: +2 lines, prior byte-identical, ordinal-sorted' $hygiene "lines=$($afterFirst.Count)"
 
     Add-SandboxPairFiles -RepoDir $sb -Stem 'zzz-third'
@@ -525,7 +528,7 @@ function Invoke-SortAppendTests {
     [string[]]$afterSecond = @(Get-ManifestLines -RepoDir $sb)
     [bool]$intact2 = $true
     foreach ($line in $afterFirst) { if (@($afterSecond) -cnotcontains $line) { $intact2 = $false } }
-    Test-Assert 'sort-05 re-append stable: six lines, prior intact, still sorted' (($afterSecond.Count -eq 6) -and $intact2 -and (Test-OrdinalSortedLines -Lines $afterSecond)) "lines=$($afterSecond.Count)"
+    Test-Assert 'sort-05 re-append stable: prior intact, still sorted' (($afterSecond.Count -eq ($afterFirst.Count + 2)) -and $intact2 -and (Test-OrdinalSortedLines -Lines $afterSecond)) "lines=$($afterSecond.Count)"
 }
 
 function Copy-MachineryIntoScratch {
@@ -658,12 +661,13 @@ function Invoke-FreshCloneTests {
     Test-Assert 'byte-01 cmd pipe equals .NET equals manifest' $threeWay "pipe=$pipeHash net=$netHash manifest=$manifestHash"
 
     # legal-01..03: compliant paired registration accepted on a fresh clone.
+    [string[]]$legalBaseline = @(Get-ManifestLines -RepoDir $sb)
     Add-SandboxPairFiles -RepoDir $sb -Stem 'alpha-guide'
     $reg = Invoke-Register -RepoDir $sb -SourcePath 'bibliografia/alpha-guide.pdf'
     $null = Invoke-Git -RepoDir $sb -GitArgs @('add', '--', 'integrity/manifest.sha256')
     $r = Invoke-Commit -RepoDir $sb -Message 'register alpha-guide pair'
     [string]$commitOut = ($r.Output -join ' | ')
-    Test-Assert 'legal-01 compliant paired registration commit accepted' ((0 -eq $r.Code) -and $commitOut.Contains('[integrity] OK:') -and (4 -eq @(Get-ManifestLines -RepoDir $sb).Count)) "exit=$($r.Code); out=$commitOut"
+    Test-Assert 'legal-01 compliant paired registration commit accepted' ((0 -eq $r.Code) -and $commitOut.Contains('[integrity] OK:') -and (($legalBaseline.Count + 2) -eq @(Get-ManifestLines -RepoDir $sb).Count)) "exit=$($r.Code); out=$commitOut"
 
     # legal-04..05: atomic pair deletion with traceability accepted.
     $null = Invoke-Git -RepoDir $sb -GitArgs @('rm', '-q', '--', 'bibliografia/alpha-guide.pdf', 'apuntes/alpha-guide.md')
@@ -671,7 +675,7 @@ function Invoke-FreshCloneTests {
     Write-SandboxText -Path (Join-Path $sb 'integrity\manifest.sha256') -Text ($keptText + "`n")
     $null = Invoke-Git -RepoDir $sb -GitArgs @('add', '--', 'integrity/manifest.sha256')
     $r = Invoke-Commit -RepoDir $sb -Message 'atomic deletion of alpha-guide pair'
-    Test-Assert 'legal-04 atomic pair deletion accepted, baseline restored' ((0 -eq $r.Code) -and (2 -eq @(Get-ManifestLines -RepoDir $sb).Count)) "exit=$($r.Code); lines=$(@(Get-ManifestLines -RepoDir $sb).Count)"
+    Test-Assert 'legal-04 atomic pair deletion accepted, baseline restored' ((0 -eq $r.Code) -and ($legalBaseline.Count -eq @(Get-ManifestLines -RepoDir $sb).Count)) "exit=$($r.Code); lines=$(@(Get-ManifestLines -RepoDir $sb).Count)"
 }
 
 function Invoke-WorktreeNoiseTest {
