@@ -1,2 +1,6 @@
 # Local AI runtime state
-.atl/
+atl/
+
+solucion.md
+*.docx
+__pycache__/

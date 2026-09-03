@@ -18,6 +18,9 @@ sources.
 | `.githooks/pre-commit` | Versioned hook shim (delegates to the verifier) |
 | `tools/integrity/verify.ps1` | Pre-commit verifier over staged index blobs |
 | `tools/integrity/register.ps1` | Additions-only pair registration helper |
+| `tps/build_tp.py` | Generador de documentos .docx con carátula |
+| `tools/docx_builder.py` | Generador base de documentos .docx |
+| `tools/logo_unpsjb.png` | Logo de la universidad (para carátulas) |
 
 ## Setup (per clone)
 
@@ -112,3 +115,54 @@ git config --unset core.hooksPath
 ```
 
 Nothing else depends on it; sources on disk are untouched.
+
+## Generación de documentos de Trabajos Prácticos
+
+Cada TP vive en `tps/<numero>/` con esta estructura:
+
+```
+tps/
+  <numero>/
+    consigna.md          # enunciado del TP (título extraído para la carátula)
+    A/
+      solucion.md        # resolución en Markdown
+      *.png              # capturas de pantalla (opcional)
+```
+
+El script `tps/build_tp.py` genera un `.docx` con una carátula como
+primera página y el contenido de `solucion.md` parseado a continuación.
+
+### Uso
+
+```sh
+python tps/build_tp.py <numero>
+```
+
+Ejemplo:
+
+```sh
+python tps/build_tp.py 1
+```
+
+Esto genera `tps/1/trabajo_practico.docx` con:
+
+1. **Carátula** — logo UNPSJB, universidad, facultad, carrera, título del TP
+   (extraído de `consigna.md`), materia, JTP y alumno.
+2. **Contenido** — todo el `solucion.md` parseado (tablas, código, listas,
+   blockquotes, negritas).
+
+### Configuración
+
+Los datos de la carátula están al inicio de `tps/build_tp.py`:
+
+```python
+MATERIA = "Administración de Redes y Seguridad"
+JTP = "Lucas Krmpotic"
+ALUMNO = "Gonzalo Agú"
+```
+
+### Dependencias
+
+```sh
+pip install python-docx
+```
