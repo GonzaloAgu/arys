@@ -53,6 +53,47 @@ def _centered_run(doc, text, *, font_size, bold=False, color, font_name="Calibri
     return p
 
 
+def _add_hyperlink(paragraph, text, url, font_size=18):
+    part = paragraph.part
+    r_id = part.relate_to(
+        url,
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    hyperlink = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}hyperlink",
+        {"{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id": r_id},
+    )
+    new_run = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+        {},
+    )
+    rPr = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rPr",
+        {},
+    )
+    color = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}color",
+        {"{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val": "1A1A2E"},
+    )
+    u = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}u",
+        {"{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val": "single"},
+    )
+    sz = paragraph._element.makeelement(
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}sz",
+        {"{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val": str(font_size)},
+    )
+    rPr.append(color)
+    rPr.append(u)
+    rPr.append(sz)
+    new_run.append(rPr)
+    new_run.text = text
+    hyperlink.append(new_run)
+    paragraph._element.append(hyperlink)
+    return hyperlink
+
+
 def _centered_image(doc, path, width):
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -78,7 +119,7 @@ def add_cover(doc, titulo: str):
     _empty_paragraph(doc, 4)
     _centered_run(doc, "Facultad de Ingeniería",
                   font_size=Pt(9), bold=False, color=RGBColor(0x66, 0x66, 0x66))
-    _centered_run(doc, "Ingeniería en Sistemas de Información",
+    _centered_run(doc, "Licenciatura en Sistemas",
                   font_size=Pt(9), bold=False, color=RGBColor(0x66, 0x66, 0x66))
 
     _empty_paragraph(doc, 8)
@@ -114,6 +155,28 @@ def add_cover(doc, titulo: str):
         _centered_run(doc, value,
                       font_size=Pt(13), bold=True, color=RGBColor(0x1A, 0x1A, 0x2E))
         _empty_paragraph(doc, 10)
+
+    # Separador + repositorio
+    _empty_paragraph(doc, 6)
+    p_line2 = doc.add_paragraph()
+    p_line2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_line2.paragraph_format.space_before = Pt(0)
+    p_line2.paragraph_format.space_after = Pt(0)
+    run_line2 = p_line2.add_run("━" * 50)
+    run_line2.font.size = Pt(8)
+    run_line2.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
+
+    _empty_paragraph(doc, 6)
+
+    _centered_run(doc, "Repositorio",
+                  font_size=Pt(9), bold=False, color=RGBColor(0x77, 0x77, 0x77))
+
+    p_repo = doc.add_paragraph()
+    p_repo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_repo.paragraph_format.space_before = Pt(2)
+    p_repo.paragraph_format.space_after = Pt(0)
+    _add_hyperlink(p_repo, "github.com/GonzaloAgu/arys",
+                   "https://github.com/GonzaloAgu/arys", font_size=22)
 
     doc.add_page_break()
 
