@@ -1,7 +1,6 @@
 # Local AI runtime state
 atl/
 
-solucion.md
 *.docx
 __pycache__/
 *.pdf

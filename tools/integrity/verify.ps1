@@ -8,7 +8,9 @@
     append-only manifest integrity/manifest.sha256:
 
       - recomputes SHA-256 over each staged protected blob,
-      - enforces source<->Markdown pairing (bibliografia/{stem}.pdf|.txt <=> apuntes/{stem}.md),
+      - enforces source<->Markdown pairing:
+          bibliografia/{stem}.pdf|.txt <=> apuntes/{stem}.md
+          bibliografia/{stem}.md        <=> bibliografia/{stem}.md (self-paired)
       - enforces the single-source-per-stem invariant,
       - enforces append-only registration and the sole atomic-deletion exception,
       - rejects registry tampering.
@@ -166,26 +168,34 @@ function Parse-ManifestBytes {
 
 # --------------------------------------------------------------- pairing ----
 
-# 'pdf' | 'txt' | $null  — the single extension classifier for protected sources.
+# 'pdf' | 'txt' | 'md' | $null  — the single extension classifier for protected sources.
 function Get-SourceKind {
     param([string]$Path)
     if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.pdf')) { return 'pdf' }
     if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.txt')) { return 'txt' }
+    if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.md'))  { return 'md' }
     return $null
 }
 
-# Syntactic mirror mapping, both directions. Sources map 1:1 to apuntes/<stem>.md
-# ('.pdf'/'.txt' are both 4 chars, so Substring(13, Len-17) is unchanged).
-# Markdown maps to BOTH bibliografia candidates; the single-source-per-stem
+# Syntactic mirror mapping, both directions. Sources map 1:1 to their mirror:
+#   .pdf/.txt -> apuntes/<stem>.md
+#   .md       -> bibliografia/<stem>.md (self-paired; the source IS the markdown)
+# Markdown in apuntes/ maps to ALL bibliografia candidates; the single-source-per-stem
 # invariant guarantees at most one exists.
 function Get-MirrorCandidates {
     param([string]$Path)
     if ($null -ne (Get-SourceKind $Path)) {
-        return @('apuntes/' + $Path.Substring(13, $Path.Length - 17) + '.md')
+        $stem = $Path.Substring(13, $Path.Length - 17)
+        $kind = Get-SourceKind $Path
+        if ($kind -eq 'md') {
+            # Self-paired: the .md in bibliografia/ is its own mirror.
+            return @($Path)
+        }
+        return @('apuntes/' + $stem + '.md')
     }
     if ($Path.StartsWith('apuntes/') -and $Path.EndsWith('.md')) {
         $stem = $Path.Substring(8, $Path.Length - 11)
-        return @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")
+        return @("bibliografia/$stem.pdf", "bibliografia/$stem.txt", "bibliografia/$stem.md")
     }
     return @()
 }
@@ -256,22 +266,32 @@ foreach ($p in $index.Keys) {
 }
 
 # Check 3: source<->Markdown pairing (both staged AND both registered).
+# For .pdf/.txt sources, the mirror is apuntes/{stem}.md.
+# For .md sources, the file is self-paired (source IS the markdown).
 foreach ($p in $index.Keys) {
     $kind = Get-SourceKind $p
     if ($null -ne $kind) {                      # source direction: 1:1 mirror
-        $mirror = 'apuntes/' + $p.Substring(13, $p.Length - 17) + '.md'
-        if (-not $index.Contains($mirror)) {
-            if ($kind -eq 'pdf') { $violations.Add("unpaired PDF (missing staged Markdown counterpart '$mirror'): $p") }
-            else                 { $violations.Add("unpaired web link (missing staged Markdown counterpart '$mirror'): $p") }
-        }
-        elseif (-not ($stagedMap.Contains($p) -and $stagedMap.Contains($mirror))) {
-            $violations.Add("pair members must both carry manifest lines in the same commit: $p <-> $mirror")
+        if ($kind -eq 'md') {
+            # Self-paired .md: the source IS the markdown; no separate apuntes/ file needed.
+            # Just verify it's registered.
+            if (-not ($stagedMap.Contains($p))) {
+                $violations.Add("unregistered .md source (register it via tools/integrity/register.ps1): $p")
+            }
+        } else {
+            $mirror = 'apuntes/' + $p.Substring(13, $p.Length - 17) + '.md'
+            if (-not $index.Contains($mirror)) {
+                if ($kind -eq 'pdf') { $violations.Add("unpaired PDF (missing staged Markdown counterpart '$mirror'): $p") }
+                else                 { $violations.Add("unpaired web link (missing staged Markdown counterpart '$mirror'): $p") }
+            }
+            elseif (-not ($stagedMap.Contains($p) -and $stagedMap.Contains($mirror))) {
+                $violations.Add("pair members must both carry manifest lines in the same commit: $p <-> $mirror")
+            }
         }
     }
     elseif ($p.StartsWith('apuntes/') -and $p.EndsWith('.md')) {   # reverse direction
         $stem = $p.Substring(8, $p.Length - 11)
         $present = @()
-        foreach ($c in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")) {
+        foreach ($c in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt", "bibliografia/$stem.md")) {
             if ($index.Contains($c)) { $present += $c }
         }
         if ($present.Count -eq 0) {
@@ -284,7 +304,7 @@ foreach ($p in $index.Keys) {
     }
 }
 
-# Check 8: duplicate source stem in bibliografia/ (pdf OR web link). Runs after
+# Check 8: duplicate source stem in bibliografia/ (pdf, web link, or .md). Runs after
 # check 3 so reverse-direction double-pairs are left to this single reporting site.
 $stemSources = New-Object System.Collections.Specialized.OrderedDictionary   # stem -> List[string]
 foreach ($p in $index.Keys) {
@@ -295,7 +315,7 @@ foreach ($p in $index.Keys) {
 }
 foreach ($stem in $stemSources.Keys) {
     if ($stemSources[$stem].Count -gt 1) {
-        $violations.Add("duplicate source stem '$stem': " + [string]::Join(', ', $stemSources[$stem]) + " (all map to 'apuntes/$stem.md')")
+        $violations.Add("duplicate source stem '$stem': " + [string]::Join(', ', $stemSources[$stem]) + " (all map to 'apuntes/$stem.md' or self-paired)")
     }
 }
 

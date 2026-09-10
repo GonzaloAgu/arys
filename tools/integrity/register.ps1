@@ -2,24 +2,28 @@
 <#
 .SYNOPSIS
     Additions-only registration of a protected source + Markdown pair into the
-    source manifest, for a PDF (bibliografia/*.pdf) or a web link (*.txt).
+    source manifest, for a PDF (bibliografia/*.pdf), web link (*.txt), or a
+    self-paired Markdown file (bibliografia/*.md).
 
 .DESCRIPTION
     Workflow (stage -> register -> stage):
-      1. Stage BOTH files:   git add bibliografia/<stem>.pdf|.txt apuntes/<stem>.md
-      2. Register the pair:  powershell -NoProfile -ExecutionPolicy Bypass `
-                                -File tools/integrity/register.ps1 `
-                                -Source bibliografia/<stem>.txt
-      3. Restage manifest:   git add integrity/manifest.sha256
+      1. Stage the files:      git add bibliografia/<stem>.pdf|.txt|.md [apuntes/<stem>.md]
+      2. Register the pair:    powershell -NoProfile -ExecutionPolicy Bypass `
+                                  -File tools/integrity/register.ps1 `
+                                  -Source bibliografia/<stem>.txt
+      3. Restage manifest:     git add integrity/manifest.sha256
       4. Commit.
 
     Web links (*.txt) must contain exactly one line holding a single absolute
     http(s):// URL; the URL is validated over the staged blob only.
 
+    Markdown sources (*.md) are self-paired: the file in bibliografia/ IS the
+    markdown content, so no separate apuntes/ mirror is needed.
+
     Refuses to run unless:
       - the given source is staged under bibliografia/ with a [a-z0-9-]+ stem,
-      - its mirrored Markdown apuntes/<same-stem>.md is also staged,
-      - no other source (PDF or web) already uses that stem,
+      - its mirrored Markdown apuntes/<same-stem>.md is also staged (pdf/txt only),
+      - no other source (PDF, web, or .md) already uses that stem,
       - neither path is already registered (append-only; no mutation, no re-baseline).
 
     Hashes are taken from STAGED blob oids only (never working-tree bytes), so
@@ -168,11 +172,12 @@ foreach ($line in $lines) {
     return $map
 }
 
-# 'pdf' | 'txt' | $null  — the single extension classifier for protected sources.
+# 'pdf' | 'txt' | 'md' | $null  — the single extension classifier for protected sources.
 function Get-SourceKind {
     param([string]$Path)
     if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.pdf')) { return 'pdf' }
     if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.txt')) { return 'txt' }
+    if ($Path.StartsWith('bibliografia/') -and $Path.EndsWith('.md'))  { return 'md' }
     return $null
 }
 
@@ -192,15 +197,21 @@ $kind = Get-SourceKind $sourcePath
 if ($null -eq $kind) {
     Exit-Refuse "source must be a staged PDF or web link under bibliografia/ (.pdf or .txt): '$sourcePath'."
 }
-$stem = $sourcePath.Substring(13, $sourcePath.Length - 17)   # strip bibliografia/ and .pdf|.txt
+$stem = $sourcePath.Substring(13, $sourcePath.Length - 17)   # strip bibliografia/ and .pdf|.txt|.md
 foreach ($segment in ($stem -split '/')) {
     if ($segment -notmatch '^[a-z0-9-]+$') {
         Exit-Refuse "invalid stem '$segment' in '$sourcePath'; allowed characters are [a-z0-9-]."
     }
 }
-$mdPath = 'apuntes/' + $stem + '.md'
 
-Write-Msg "[register] Pair: $sourcePath <-> $mdPath"
+# For .md sources, the file IS the markdown — no separate apuntes/ mirror needed.
+if ($kind -eq 'md') {
+    $mdPath = $sourcePath
+    Write-Msg "[register] Self-paired .md source: $sourcePath"
+} else {
+    $mdPath = 'apuntes/' + $stem + '.md'
+    Write-Msg "[register] Pair: $sourcePath <-> $mdPath"
+}
 
 # --- enumerate staged index over the protected roots -------------------------
 $index = New-Object System.Collections.Specialized.OrderedDictionary  # path -> oid
@@ -238,8 +249,8 @@ else {
     }
 }
 
-# --- cross-kind stem check: at most one source (PDF or web) per stem ----------
-foreach ($sibling in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt")) {
+# --- cross-kind stem check: at most one source (PDF, web link, or .md) per stem --
+foreach ($sibling in @("bibliografia/$stem.pdf", "bibliografia/$stem.txt", "bibliografia/$stem.md")) {
     if ($sibling -eq $sourcePath) { continue }
     if ($baseMap.Contains($sibling)) {
         Exit-Refuse "stem '$stem' already has registered source '$sibling'; one source per stem is allowed."
@@ -274,13 +285,21 @@ if ($kind -eq 'txt') {
 
 # --- hash the STAGED blobs ------------------------------------------------------
 $sourceHash = Get-StagedBlobHash $index[$sourcePath]
-$mdHash = Get-StagedBlobHash $index[$mdPath]
+if ($kind -eq 'md') {
+    # .md source is self-paired; only one manifest entry needed.
+    $mdHash = $sourceHash
+} else {
+    $mdHash = Get-StagedBlobHash $index[$mdPath]
+}
 
 # --- rebuild the manifest deterministically -----------------------------------
 $newMap = New-Object System.Collections.Specialized.OrderedDictionary
 foreach ($key in $baseMap.Keys) { $newMap[$key] = $baseMap[$key] }
 $newMap[$sourcePath] = $sourceHash
-$newMap[$mdPath] = $mdHash
+if ($kind -ne 'md') {
+    # .md sources are self-paired; no separate apuntes/ entry needed.
+    $newMap[$mdPath] = $mdHash
+}
 
 # Append-only guarantee: every pre-existing entry must be carried over verbatim.
 foreach ($key in $baseMap.Keys) {
@@ -314,8 +333,13 @@ if ($LASTEXITCODE -ne 0) {
     Exit-Broken "failed to restage manifest: $restage"
 }
 
-Write-Msg "[register] Appended 2 manifest line(s):"
-Write-Msg "[register]   $sourceHash  $sourcePath"
-Write-Msg "[register]   $mdHash  $mdPath"
+if ($kind -eq 'md') {
+    Write-Msg "[register] Appended 1 manifest line(s):"
+    Write-Msg "[register]   $sourceHash  $sourcePath"
+} else {
+    Write-Msg "[register] Appended 2 manifest line(s):"
+    Write-Msg "[register]   $sourceHash  $sourcePath"
+    Write-Msg "[register]   $mdHash  $mdPath"
+}
 Write-Msg "[register] Manifest rewritten ($($newMap.Count) entries, ordinal-sorted, LF, no BOM) and restaged."
 exit 0

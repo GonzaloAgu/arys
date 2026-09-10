@@ -369,7 +369,7 @@ function Invoke-MirrorUnitTests {
     $cases = @(
         @{ Name = 'mirror-01 pdf source maps to apuntes/<stem>.md'; Path = 'bibliografia/unidad-01-conceptos-de-seguridad.pdf'; Kind = 'pdf'; Cand = 'apuntes/unidad-01-conceptos-de-seguridad.md' },
         @{ Name = 'mirror-02 txt source maps to apuntes/<stem>.md'; Path = 'bibliografia/unidad-01-teoria-web.txt'; Kind = 'txt'; Cand = 'apuntes/unidad-01-teoria-web.md' },
-        @{ Name = 'mirror-03 apuntes/<stem>.md maps to both source candidates'; Path = 'apuntes/unidad-01-teoria-web.md'; Kind = 'null'; Cand = 'bibliografia/unidad-01-teoria-web.pdf,bibliografia/unidad-01-teoria-web.txt' },
+        @{ Name = 'mirror-03 apuntes/<stem>.md maps to all source candidates'; Path = 'apuntes/unidad-01-teoria-web.md'; Kind = 'null'; Cand = 'bibliografia/unidad-01-teoria-web.pdf,bibliografia/unidad-01-teoria-web.txt,bibliografia/unidad-01-teoria-web.md' },
         @{ Name = 'mirror-04 non-pairable path maps to empty set'; Path = 'apuntes/extra-notes.txt'; Kind = 'null'; Cand = '' }
     )
     foreach ($case in $cases) {
