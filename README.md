@@ -18,8 +18,9 @@ sources.
 | `.githooks/pre-commit` | Versioned hook shim (delegates to the verifier) |
 | `tools/integrity/verify.ps1` | Pre-commit verifier over staged index blobs |
 | `tools/integrity/register.ps1` | Additions-only pair registration helper |
-| `tps/build_tp.py` | Generador de documentos .docx con carátula |
-| `tools/docx_builder.py` | Generador base de documentos .docx |
+| `tps/build_tp.py` | Generador de documentos .docx (integración con pandoc) |
+| `tools/reference.docx` | Plantilla de estilos (carátula + cuerpo) que usa pandoc |
+| `tools/make_reference.py` | Regenera `tools/reference.docx` desde el template por defecto de pandoc |
 | `tools/logo_unpsjb.png` | Logo de la universidad (para carátulas) |
 
 ## Setup (per clone)
@@ -129,13 +130,20 @@ tps/
       *.png              # capturas de pantalla (opcional)
 ```
 
-El script `tps/build_tp.py` genera un `.docx` con una carátula como
-primera página y el contenido de `solucion.md` parseado a continuación.
+El script `tps/build_tp.py` genera el entregable del TP con una carátula como
+primera página y el contenido de `solucion.md` a continuación. La conversión
+la hace **pandoc**; el script solo arma la carátula en Markdown, la antepone
+al contenido y delega la conversión en pandoc. No usa python-docx ni un parser
+de Markdown propio.
+
+**Formato por defecto: PDF.** El PDF se genera estilizando el HTML con CSS
+(`tools/tp_style.css`) e imprimiéndolo con Chrome/Edge headless.
 
 ### Uso
 
 ```sh
-python tps/build_tp.py <numero>
+python tps/build_tp.py <numero>          # PDF  -> tps/N/trabajo_practico.pdf
+python tps/build_tp.py <numero> --docx   # DOCX -> tps/N/trabajo_practico.docx
 ```
 
 Ejemplo:
@@ -144,12 +152,35 @@ Ejemplo:
 python tps/build_tp.py 1
 ```
 
-Esto genera `tps/1/trabajo_practico.docx` con:
+Esto genera `tps/1/trabajo_practico.pdf` con:
 
 1. **Carátula** — logo UNPSJB, universidad, facultad, carrera, título del TP
    (extraído de `consigna.md`), materia, JTP y alumno.
-2. **Contenido** — todo el `solucion.md` parseado (tablas, código, listas,
-   blockquotes, negritas).
+2. **Contenido** — todo el `solucion.md` parseado por pandoc (tablas, código,
+   listas anidadas, imágenes, blockquotes, negritas).
+
+### Instalación (única)
+
+Se necesita pandoc en el PATH:
+
+```sh
+winget install --id JohnMacFarlane.Pandoc
+```
+
+o desde https://pandoc.org/installing.html
+
+Para el PDF se usa **Google Chrome o Microsoft Edge** (headless); si no están
+instalados, instalá cualquiera de los dos. Para reestilizar el PDF editá
+`tools/tp_style.css`.
+
+Para el DOCX, en el primer uso `build_tp.py` genera automáticamente
+`tools/reference.docx` (llamando a `tools/make_reference.py`, que usa solo la
+stdlib de Python). Para reestilizar la carátula o el cuerpo del DOCX, editá
+los estilos de `tools/reference.docx` en Word y regeneralo con:
+
+```sh
+python tools/make_reference.py
+```
 
 ### Configuración
 
@@ -163,6 +194,4 @@ ALUMNO = "Gonzalo Agú"
 
 ### Dependencias
 
-```sh
-pip install python-docx
-```
+Pandoc + Chrome o Edge (PDF) y pandoc (DOCX). Ver "Instalación (única)".

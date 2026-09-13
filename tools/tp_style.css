@@ -1,0 +1,163 @@
+/* tools/tp_style.css — Estilos del PDF (HTML + Chrome headless vía build_tp.py). */
+
+@page {
+  size: A4;
+  margin: 2.5cm 2.5cm 2cm 2cm;
+}
+
+:root {
+  --navy: #1A1A2E;
+  --ink: #16161f;
+  --muted: #6a6a7a;
+  --line: #c9ccd6;
+  --soft: #f6f7fb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Segoe UI", "Calibri", sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ── Titulares ────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 {
+  color: var(--navy);
+  font-weight: 700;
+  page-break-after: avoid;
+}
+h1 {
+  font-size: 16pt;
+  margin: 20px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--navy);
+  letter-spacing: .2px;
+}
+h2 { font-size: 13pt; margin: 18px 0 8px; }
+h3 { font-size: 11.5pt; margin: 14px 0 6px; }
+h4 { font-size: 10.5pt; margin: 12px 0 6px; }
+
+p { margin: 0 0 8px; }
+
+a { color: var(--navy); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Código ───────────────────────────────────────────────────────────── */
+code {
+  font-family: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  font-size: 8.5pt;
+  background: #eef0f5;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+pre {
+  background: var(--soft);
+  border: 1px solid #e2e4ec;
+  border-radius: 5px;
+  padding: 9px 12px;
+  font-family: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  font-size: 8pt;
+  line-height: 1.35;
+  overflow-x: auto;
+  page-break-inside: avoid;
+  margin: 6px 0 12px;
+}
+pre code { background: none; padding: 0; }
+
+/* ── Tablas ───────────────────────────────────────────────────────────── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0 14px;
+  font-size: 9.5pt;
+}
+th {
+  background: var(--navy);
+  color: #fff;
+  border: 1px solid var(--navy);
+  padding: 6px 9px;
+  text-align: left;
+  font-weight: 600;
+}
+td {
+  border: 1px solid var(--line);
+  padding: 5px 9px;
+  vertical-align: top;
+}
+tr:nth-child(even) td { background: #f7f8fc; }
+tr { page-break-inside: avoid; }
+
+/* ── Citas y separadores ──────────────────────────────────────────────── */
+blockquote {
+  margin: 8px 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--navy);
+  color: var(--muted);
+}
+hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 14px 0;
+}
+
+/* ── Listas ───────────────────────────────────────────────────────────── */
+ul, ol { margin: 4px 0 10px; padding-left: 24px; }
+li { margin: 2px 0; }
+li > p { margin-bottom: 2px; }
+
+/* ── Imágenes ─────────────────────────────────────────────────────────── */
+img { max-width: 100%; height: auto; page-break-inside: avoid; }
+
+/* ── Carátula ─────────────────────────────────────────────────────────── */
+.cover-logo {
+  text-align: center;
+  margin: 30px 0 26px;
+}
+.cover-logo img { width: 110px; height: auto; }
+.cover-univ {
+  text-align: center;
+  font-size: 11pt;
+  font-weight: 600;
+  color: #3a3a4a;
+  letter-spacing: .4px;
+  margin-bottom: 2px;
+}
+.cover-sub { text-align: center; font-size: 10pt; color: #6a6a7a; margin: 1px 0; }
+.cover-rule {
+  text-align: center;
+  color: var(--navy);
+  font-size: 13pt;
+  margin: 20px 0 16px;
+  letter-spacing: -3px;
+}
+.cover-title {
+  text-align: center;
+  font-size: 23pt;
+  line-height: 1.18;
+  font-weight: 800;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin: 4px 0 14px;
+}
+.cover-materia {
+  text-align: center;
+  font-size: 13pt;
+  color: #2e2e3c;
+  margin-bottom: 26px;
+}
+.cover-label { text-align: center; font-size: 12pt; color: #8a8a9a; margin-top: 16px; }
+.cover-value {
+  text-align: center;
+  font-size: 14pt;
+  font-weight: 700;
+  color: var(--navy);
+  margin-top: 2px;
+}
+.cover-repo { text-align: center; margin-top: 8px; }
+.cover-repo a { font-size: 12.5pt; color: var(--navy); }
+
+.page-break { page-break-after: always; }
