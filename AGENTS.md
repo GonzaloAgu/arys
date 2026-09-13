@@ -1,0 +1,1 @@
+Todas las afirmaciones que se realicen a la hora de resolver un trabajo (por ejemplo, escribiendo en un solucion.md), deben estar sustentadas con algún elemento de bibliografía. Las fuentes deben ser citadas en esos casos.
