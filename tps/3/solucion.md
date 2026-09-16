@@ -38,9 +38,29 @@ Se tomaron instantáneas de las máquinas con esta configuración.
 ## Parte B - Reconocimiento pasivo (OSINT)
 Para esta parte voy a utilizar el bash de Linux de WSL en lugar de la máquina virtual de Kali, ya que ésta la estamos manteniendo desconectada de internet (sólo tiene conexión con la otra MV, como se describió en la parte A).
 
-Sin embargo, el comando whois no retorna información.
+Sin embargo, me encontré con que el servidor DNS para el comando `dig` hace un timeout, y que el `whois` responde que el dominio no está registrado.
 
-![](assets/whois%20unp.PNG)
+![](assets/dns-unp-falla.jpeg)
+
+Ante la sugerencia del docente de probar cambiar a los DNS de Google, fui a averiguar cómo hacerlo desde la terminal de bash. Me encontré con [ésta guía](https://www.ionos.co.uk/digitalguide/server/configuration/change-dns-server-on-ubuntu/) cuya solución emplea un paquete `resolvconf`.
+
+```
+sudo apt update
+sudo apt upgrade
+sudo apt install resolvconf
+```
+
+Sin embargo, me atoré en el paso 2. Aparentemente, en WSL tanto el DNS como los servicios no se pueden manejar así.
+
+![](assets/fallo-dns-wsl.PNG)
+
+Le consulté a Gemini y me instó a configurar el archivo `/etc/wsl.conf`, donde debo configurar las IPs de los servers que deseo (8.8.8.8 y 8.8.4.4) y desactivar una sobreescritura que Windows hace sobre la configuración de DNS.
+
+**Pero!** En el medio de esto recibí una respuesta de Zape en el grupo. Resulta que para el comando `dig`, se puede poner `@8.8.8.8` antes del nombre. Así, el comando me devolvió la información correctamente.
+
+![](assets/dig-con-arroba.PNG)
+
+> Lamentablemente, esta solución no sirve para solucionar el problema con whois, ya que, de hecho, whois no hace consultas DNS. Es un protocolo que utiliza un puerto distinto y tiene ese único fin
 
 
 ## Parte C - Escaneo del laboratorio (contra Metasploitable)
@@ -97,3 +117,17 @@ Con el -sV podemos ver las versiones instaladas en el equipo. Esto es fundamenta
 ### Punto 4
 *Interpretá un puerto filtered si aparece: ¿qué lo produce?*
 No apareció en nuestro escaneo ningún caso. De acuerdo a [cPanel](https://support.cpanel.net/hc/en-us/articles/360051526613-What-s-the-difference-between-a-closed-port-and-a-filtered-port?st_source=ai_overview), esto se produce cuando existe algún firewall o filtro en el enrutador que esté bloqueando la conexión.
+
+## Parte D — Análisis y defensa
+
+| Servicio / versión | CVE | Riesgo (CVSS aprox.) | Cómo lo detectaría un defensor | Contramedida |
+|---|---|---|---|---|
+| PostgreSQL 8.3 (5432/tcp) | CVE-2012-3489 | 6.5 · Medio [1] | | |
+| OpenSSH 4.7p1 (22/tcp) | CVE-2018-15473 | 5.3 · Medio [2] | | |
+| MySQL 5.0.51a (3306/tcp) | CVE-2010-1848 | 6.5 · Medio [3] | | |
+
+### Referencias
+
+- [1] NVD — CVE-2012-3489: [https://nvd.nist.gov/vuln/detail/CVE-2012-3489](https://nvd.nist.gov/vuln/detail/CVE-2012-3489)
+- [2] NVD — CVE-2018-15473: [https://nvd.nist.gov/vuln/detail/CVE-2018-15473](https://nvd.nist.gov/vuln/detail/CVE-2018-15473)
+- [3] NVD — CVE-2010-1848: [https://nvd.nist.gov/vuln/detail/CVE-2010-1848](https://nvd.nist.gov/vuln/detail/CVE-2010-1848)
