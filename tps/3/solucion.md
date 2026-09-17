@@ -58,10 +58,29 @@ Le consulté a Gemini y me instó a configurar el archivo `/etc/wsl.conf`, donde
 
 **Pero!** En el medio de esto recibí una respuesta de Zape en el grupo. Resulta que para el comando `dig`, se puede poner `@8.8.8.8` antes del nombre. Así, el comando me devolvió la información correctamente.
 
-![](assets/dig-con-arroba.PNG)
+![](assets/dig-any.PNG)
 
-> Lamentablemente, esta solución no sirve para solucionar el problema con whois, ya que, de hecho, whois no hace consultas DNS. Es un protocolo que utiliza un puerto distinto y tiene ese único fin
+> Lamentablemente, esta solución no sirve para solucionar el problema con whois, ya que, de hecho, whois no hace consultas DNS. Es un protocolo que utiliza un puerto distinto y el DNS de Google no responde este tipo de consultas.
 
+### Punto 1
+*¿Quién administra el dominio y qué servidores de correo y de nombres usa?*
+- Si bien no pudimos averiguarlo mediante whois, los dominios .edu.ar son administrados por la [Asociación de Redes de Interconexión Universitaria](https://riu.edu.ar/dominios-edu-ar).
+- El servidor de correo que utiliza es: pmg.unp.edu.ar
+- Sus servidores de nombre son chenque.unp.edu.ar y unpata.unp.edu.ar
+
+### Punto 2
+*Listá cinco subdominios encontrados por crt.sh. ¿Alguno sugiere un servicio interesante (correo, campus, VPN, admin)?*
+
+- `git.fi.mdn.unp.edu.ar`: Parece ser que la universidad tiene su propio servidor de git remoto. Quizás un GitLab.
+- `campusanterior.mdn.unp.edu.ar` y `campusactualizado.mdn.unp.edu.ar` parecen haber sido entornos de pruebas al renovar el campus a principios de año.
+- `icescrum.fi.mdn.unp.edu.ar`: Está activo al momento de escribir esto. Es una plataforma de scrum, seguramente usada por el equipo de desarrollo de la Universidad.
+- `diego-prueba.dztw.unp.edu.ar`: Dieguito agregó un subdominio para sus pruebas.
+
+[](assets/crt-sh-resultado.PNG)
+
+### Punto 3
+*Explicá la diferencia entre lo que hiciste acá (pasivo) y un escaneo (activo), y por qué solo uno de los dos necesita autorización.*
+Lo que hicimos fue obtener información que está pública. En un escaneo, estaríamos buscando activamente formas de vulnerar sus sistemas mediante la prueba y error sobre puertos y averiguación de versiones o sistemas operativos utilizando pings.
 
 ## Parte C - Escaneo del laboratorio (contra Metasploitable)
 
@@ -122,9 +141,15 @@ No apareció en nuestro escaneo ningún caso. De acuerdo a [cPanel](https://supp
 
 | Servicio / versión | CVE | Riesgo (CVSS aprox.) | Cómo lo detectaría un defensor | Contramedida |
 |---|---|---|---|---|
-| PostgreSQL 8.3 (5432/tcp) | CVE-2012-3489 | 6.5 · Medio [1] | | |
-| OpenSSH 4.7p1 (22/tcp) | CVE-2018-15473 | 5.3 · Medio [2] | | |
-| MySQL 5.0.51a (3306/tcp) | CVE-2010-1848 | 6.5 · Medio [3] | | |
+| PostgreSQL 8.3 (5432/tcp) | CVE-2012-3489 | 6.5 · Medio [1] | Monitoreo de logs de errores de la base por consultas XML anómalas y errores de parseo. | Actualizar a PostgreSQL 8.3.20+; restringir el servicio 5432 a la red de confianza mediante firewall (Unidad 5) y revocar acceso de usuarios no necesarios. |
+| OpenSSH 4.7p1 (22/tcp) | CVE-2018-15473 | 5.3 · Medio [2] | Monitoreo de `/var/log/auth.log` por ráfagas de intentos de autenticación con muchos usuarios distintos en poco tiempo (Monitoreo → Unidad 8); IDS puede alertar sobre patrones de conexiones SSH repetitivas (Unidad 5). | Actualizar a OpenSSH 7.8+; limitar acceso SSH por firewall a IPs autorizadas y aplicar fail2ban (mitigación oficial de Red Hat); preferir autenticación por clave (Unidad 5). |
+| MySQL 5.0.51a (3306/tcp) | CVE-2010-1848 | 6.5 · Medio [3] | Monitoreo del query log por referencias a tablas con `../` (directory traversal) y auditoría de sesiones sobre 3306 (Monitoreo → Unidad 8). | Actualizar a una versión parcheada de MySQL (≥ 5.0.51b); cerrar/limitar el puerto 3306 para evitar acceso remoto y aplicar privilegios mínimos por usuario (según Firewall → Unidad 5). |
+
+### Tres primeras acciones como administrador
+
+1. **Parchear todos los servicios críticos desactualizados** (PostgreSQL 8.3, MySQL 5.0.51a y OpenSSH 4.7p1), ya que las versiones que detectó Nmap son antiguas y conocen CVE públicos. Es la contramedida más efectiva porque elimina la causa raíz de las tres vulnerabilidades marcadas.
+2. **Aplicar una política de firewall y segmentación** para restringir los puertos de administración y bases de datos (22, 3306, 5432) solo a las IPs que realmente los necesitan (Unidad 5), reduciendo la superficie de ataque ante cualquiera de estos CVE.
+3. **Habilitar monitoreo y alertas** sobre esos servicios (logs de autenticación y consultas, Unidad 8) para detectar intentos de explotación —como enumaración de usuarios o XML malformado— antes de que se conviertan en incidentes, y así anticipar futuros ataques.
 
 ### Referencias
 
