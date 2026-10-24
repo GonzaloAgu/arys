@@ -101,7 +101,7 @@ ip neigh          # observá la MAC asociada al gateway antes y después
 **Consignas B:**
 1. Mostrá cómo **cambia la MAC** del gateway en la tabla ARP de la víctima cuando el
    spoofing está activo. Explicá por qué ARP lo permite (**RFC 826**, sin
-   autenticación).
+   autenticación). 
 2. Con el MITM activo, generá tráfico **HTTP** desde la víctima: ¿lo ve el atacante?
 3. Generá tráfico **HTTPS** desde la víctima: ¿qué ve el atacante ahora? ¿Por qué el
    MITM **no alcanza** para leer el contenido?

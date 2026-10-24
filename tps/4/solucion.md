@@ -248,27 +248,91 @@ Como podemos ver, la consulta anterior aunque fue cifrada, queda con sus consult
 
 > Solo entre tus dos VMs, en la red aislada. Nunca fuera de ahí.
 
-[Descripción de la configuración de bettercap]
+Para esta parte, ya que las VMs están una red aislada sin gateway, tomo una propuesta de la IA de agregar un tercer nodo (clon de Debian) que ofrezca un servidor HTTP.
 
+**IPs elegidas en las MVs**
+Fueron modificadas respecto a la parte A.
+
+| Máquina | Rol | IP |
+|---|---|---|
+| VM-Atacante | Kali Linux | 192.168.1.10 |
+| VM-Víctima | Debian | 192.168.1.12 |
+| VM-Servidor | Debian (HTTP y HTTPS) | 192.168.1.13 |
+
+Desde el tercer nodo abrimos un servidor HTTP y HTTPS (Debian clone):
+```
+# HTTP en claro
+sudo python3 -m http.server 80
+# HTTPS con certificado autofirmado
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 1 -subj "/CN=lab.local"
+sudo openssl s_server -accept 443 -tls1_3 -cert cert.pem -key key.pem -www
+```
+ 
 Desde la VM-Atacante:
-
-```bash
-sudo bettercap -iface eth1 -eval "set arp.spoof.targets <IP_víctima>; arp.spoof on; net.sniff on"
+```
+sudo bettercap -iface eth0 -eval "set arp.spoof.targets 192.168.1.12,192.168.1.13; set arp.spoof.internal true; set net.sniff.output /tmp/mitm.pcap; arp.spoof on; net.sniff on"
 ```
 
-En la VM-Víctima, antes y durante el ataque:
+- arp.spoof.internal true: imprescindible sin gateway, spoofea hosts de la misma subred.
+- Poner como targets a víctima y servidor: si solo ponés la víctima, ves únicamente el sentido víctima→servidor (la respuesta va directa por la MAC real).
+- net.sniff.output te deja el .pcap para abrir en Wireshark.
+
+### B.2 Tráfico HTTP con el MITM activo
+
+**Consigna B.2.** Con el MITM activo, generá tráfico HTTP desde la víctima: ¿lo ve el atacante?
+
+Con `arp.spoof` y `net.sniff` corriendo en la VM-Atacante, desde la VM-Víctima se genera una petición en claro contra el servidor del tercer nodo. Primero se agrega el nombre en `/etc/hosts` de la víctima para que la petición lleve un `Host` realista:
 
 ```bash
+echo "192.168.1.13 lab.local" | sudo tee -a /etc/hosts
+```
+
+Como el tráfico pasa por Kali (que lo reenvía con `ip_forward`), bettercap muestra en consola la petición y la respuesta en claro, y el detalle completo queda en `/tmp/mitm.pcap` para abrirlo en Wireshark con **Follow TCP Stream**. Si en el directorio del `http.server` no existe `/login`, el servidor responde con un 404 (o con el listado del directorio si se pide `/`), pero eso no importa: la petición y la respuesta siguen siendo HTTP válidas y legibles.
+
+Sí, el atacante lo ve todo: método y ruta (`GET /login?user=alumno&pass=secreto`), cabeceras `Host` y `User-Agent`, y el cuerpo de la respuesta. HTTP/1.1 se define como un protocolo de mensajes de texto y no aporta cifrado propio ([RFC 9112](https://www.rfc-editor.org/info/rfc9112)). Si la petición fuera un `POST` de login, usuario y contraseña quedarían legibles igual que en A.2.
+
+> Lamentablemente, luego de tardes batallando, no pude hacer que los pcap tengan paquetes a analizar. Me rindo.
+[](./assets/wireshark%20vacio.png)
+
+### B.3 Tráfico HTTPS con el MITM activo
+
+**Consigna B.3.** Generá tráfico HTTPS desde la víctima: ¿qué ve el atacante ahora? ¿Por qué el MITM no alcanza para leer el contenido?
+
+Misma prueba, pero contra el puerto 443 del servidor:
+
+```bash
+curl -k https://lab.local/
+```
+
+El `-k` es necesario porque el certificado del servidor es autofirmado; no cambia el ataque, solo evita que curl corte por no poder validar la cadena.
+
+Ahora el atacante ve únicamente las IPs y puertos, el handshake TLS (`ClientHello`/`ServerHello`), el **SNI** (`lab.local`) y los tamaños y tiempos de los registros. No ve la petición ni la respuesta: en TLS 1.3 el contenido de aplicación y la mayor parte del handshake, incluido el certificado del servidor, van cifrados ([RFC 9846](https://www.rfc-editor.org/info/rfc9846)). En Wireshark, `Follow TCP Stream` sobre el puerto 443 muestra datos binarios ilegibles; el filtro `tls` deja ver el handshake y, si se usa un nombre, el SNI ([RFC 6066](https://www.rfc-editor.org/info/rfc6066)).
+
+El MITM **no alcanza** porque el ARP spoofing solo desvía el tráfico en capa 2: Kali queda en el medio, pero sigue siendo un intermediario pasivo que reenvía bytes. La confidencialidad la da TLS de extremo a extremo entre la víctima y el servidor. Para leer el contenido habría que **terminar** el TLS, es decir, presentarle a la víctima un certificado propio que ella acepte; eso ya no es un MITM pasivo y requeriría instalar una CA en la víctima. Con `-k` la víctima no valida el certificado, así que un atacante que montara ese proxy TLS activo sí podría leer, pero eso es otro ataque: el ARP spoofing por sí solo no entrega las claves de la sesión.
+
+
+### B.4 Detener el ataque
+
+**Consigna B.4.** Detené el ataque (`arp.spoof off`) y verificá que la tabla ARP se normaliza.
+
+En la sesión de bettercap:
+
+```
+arp.spoof off
+```
+
+Al detenerse, bettercap restaura las cachés ARP que había modificado ([documentación de `arp.spoof`](https://www.bettercap.org/modules/ethernet/spoofers/arpspoof/)). En la VM-Víctima se comprueba que la MAC de `192.168.1.13` vuelve a ser la real del servidor:
+
+```bash
+sudo ip neigh flush all
+ping -c1 192.168.1.13
 ip neigh
 ```
 
-**Consignas B:**
-1. Mostrá cómo cambia la MAC del gateway en la tabla ARP de la víctima cuando el spoofing está activo. Explicá por qué ARP lo permite (RFC 826, sin autenticación).
-2. Con el MITM activo, generá tráfico HTTP desde la víctima: ¿lo ve el atacante?
-3. Generá tráfico HTTPS desde la víctima: ¿qué ve el atacante ahora? ¿Por qué el MITM no alcanza para leer el contenido?
-4. Detené el ataque (`arp.spoof off`) y verificá que la tabla ARP se normaliza.
+Se puede ver el cambio de MAC Address que la victima tiene del nodo servidor. Durante y posataque
+[](./assets/ip-neigh.png)
 
-**Entregable B:** capturas del cambio de tabla ARP y de lo que el atacante logra ver (y no ver) con HTTP y con HTTPS, y las respuestas.
+**Entregable B:** capturas de la consola de bettercap y de Wireshark con el tráfico HTTP legible y el HTTPS cifrado, y la tabla ARP normalizada al final.
 
 ---
 
