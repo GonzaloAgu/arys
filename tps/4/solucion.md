@@ -291,25 +291,17 @@ Como el tráfico pasa por Kali (que lo reenvía con `ip_forward`), bettercap mue
 
 Sí, el atacante lo ve todo: método y ruta (`GET /login?user=alumno&pass=secreto`), cabeceras `Host` y `User-Agent`, y el cuerpo de la respuesta. HTTP/1.1 se define como un protocolo de mensajes de texto y no aporta cifrado propio ([RFC 9112](https://www.rfc-editor.org/info/rfc9112)). Si la petición fuera un `POST` de login, usuario y contraseña quedarían legibles igual que en A.2.
 
-> Lamentablemente, luego de tardes batallando, no pude hacer que los pcap tengan paquetes a analizar. Me rindo.
+> Lamentablemente, luego de tardes batallando y varios intentos, no pude hacer que los pcap tengan paquetes a analizar. Me rindo. Lo que si, la consola de bettercap logeaba todas las solicitudes hechas de la victima al servidor.
+
 [](./assets/wireshark%20vacio.png)
 
 ### B.3 Tráfico HTTPS con el MITM activo
 
 **Consigna B.3.** Generá tráfico HTTPS desde la víctima: ¿qué ve el atacante ahora? ¿Por qué el MITM no alcanza para leer el contenido?
 
-Misma prueba, pero contra el puerto 443 del servidor:
+Misma prueba, pero contra el puerto 443 del servidor.
 
-```bash
-curl -k https://lab.local/
-```
-
-El `-k` es necesario porque el certificado del servidor es autofirmado; no cambia el ataque, solo evita que curl corte por no poder validar la cadena.
-
-Ahora el atacante ve únicamente las IPs y puertos, el handshake TLS (`ClientHello`/`ServerHello`), el **SNI** (`lab.local`) y los tamaños y tiempos de los registros. No ve la petición ni la respuesta: en TLS 1.3 el contenido de aplicación y la mayor parte del handshake, incluido el certificado del servidor, van cifrados ([RFC 9846](https://www.rfc-editor.org/info/rfc9846)). En Wireshark, `Follow TCP Stream` sobre el puerto 443 muestra datos binarios ilegibles; el filtro `tls` deja ver el handshake y, si se usa un nombre, el SNI ([RFC 6066](https://www.rfc-editor.org/info/rfc6066)).
-
-El MITM **no alcanza** porque el ARP spoofing solo desvía el tráfico en capa 2: Kali queda en el medio, pero sigue siendo un intermediario pasivo que reenvía bytes. La confidencialidad la da TLS de extremo a extremo entre la víctima y el servidor. Para leer el contenido habría que **terminar** el TLS, es decir, presentarle a la víctima un certificado propio que ella acepte; eso ya no es un MITM pasivo y requeriría instalar una CA en la víctima. Con `-k` la víctima no valida el certificado, así que un atacante que montara ese proxy TLS activo sí podría leer, pero eso es otro ataque: el ARP spoofing por sí solo no entrega las claves de la sesión.
-
+El MITM no alcanza porque el ARP spoofing solo desvía el tráfico en capa 2: Kali queda en el medio, pero sigue siendo un intermediario pasivo que reenvía bytes. La confidencialidad la da TLS de extremo a extremo entre la víctima y el servidor. Para leer el contenido habría que **terminar** el TLS, es decir, presentarle a la víctima un certificado propio que ella acepte; eso ya no es un MITM pasivo y requeriría instalar una CA en la víctima.
 
 ### B.4 Detener el ataque
 
@@ -340,8 +332,16 @@ Se puede ver el cambio de MAC Address que la victima tiene del nodo servidor. Du
 
 **Consignas C:**
 1. Para el ataque de la Parte B, indicá qué control de capa 2 lo hubiera frenado y cómo funciona: **Dynamic ARP Inspection** (apoyado en DHCP Snooping).
+
+El Dynamic ARP Inspection consiste en configurar puertos de un switch como confiables y no confiables. Si se configurara el "puerto" donde "está conectada" la máquina atacante, nunca hubiera modificado su tabla ARP.
+
 2. Para MAC flooding, ¿qué control aplica? (**Port Security**).
+
+Se establecen límites de direcciones MAC anuncialbes por cada puerto para evitar que se desborden.
+
 3. Explicá por qué, aun con todas las defensas de capa 2, la protección definitiva contra el sniffing es el cifrado extremo a extremo (enlazá con lo observado en A.3 y B.3).
+
+Porque los transportes siempre pueden ser escuchados potencialemente de formas pasivas que no se pueden detectar. En esos casos, el cifrado de extremo a extremo te garantiza confidencialidad e integridad.
 
 **Entregable C:** tabla ataque → control → cómo funciona, y el párrafo de cierre.
 
