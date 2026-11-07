@@ -2,24 +2,87 @@
 
 ## Parte A — Firewall con nftables
 
+En una VM Linux (la que oficia de "servidor"):
+
+```bash
+# Ver el estado actual
+sudo nft list ruleset
+```
+Al ejecutar este comando, observo que la VM servidor no tiene ninguna regla nft inicializada, no devuelve nada. Los comandos que ejecuté serán los que determinen la ruleset.
+
+```bash
+# Tabla y cadena de entrada con política DENY por defecto
+sudo nft add table inet filtro
+sudo nft add chain inet filtro entrada '{ type filter hook input priority 0; policy drop; }'
+```
+
+Con esto configuro que todos paquetes que tengan como destino a la máquina servidor, se dropeen.
+
+```bash
+# Permitir tráfico de conexiones ya establecidas (inspección de estado)
+sudo nft add rule inet filtro entrada ct state established,related accept
+```
+
+Esta regla hace un *conntrack del estado* (ct state) para ver si el paquete pertenece a una conexión **establecida** o que esté **relacionada** a una conexión existente.
+
+```bash
+# Permitir loopback y SSH
+sudo nft add rule inet filtro entrada iif lo accept
+sudo nft add rule inet filtro entrada tcp dport 22 accept
+```
+
+La primera regla acepta los paquetes de la *input interface* (iif) de loopback.
+La segunda regla permite los paquetes de entrada que tengan como destino el puerto 22 y sea TCP (es decir, SSH).
+
+
+Así, finalmente el resultado de estas reglas aplicadas, con `sudo nft list ruleset` obtenemos:
+
+```
+table inet filtro {
+    chain entrada {
+        type filter hook input priority filter; policy drop;
+        iif "lo" accept
+        tcp dport 22 accept
+        ct state established,related accept
+    }
+}
+```
+
 ### Consigna 1
 
 Con la política en `drop`, ¿qué pasa si intentás conectarte a un puerto **no** habilitado (por ejemplo, 8080) desde la otra VM? Probalo y explicá **por qué**.
 
-- Prueba: TODO
-- Explicación: TODO
+La primera regla de la cadena establece la política drop, lo cual significa que si se evalúan todo el resto de reglas sin que se produzca un `accept`, entonces por defecto se descartará el paquete. Si el puerto de destino es 8080, ninguna regla lo aceptará y el paquete se descarta.
+
+**Prueba:**
+Para comprobar que se me rechaza la conexión al puerto 8080, desde una máquina kali escaneo utilizando la herramienta **netcat**
+
+```bash
+nc -vz 192.168.1.10 8080
+```
+
+Donde -v muestra información detallada y -z realiza el escaneo sin enviar datos.
+
+Así, obtenemos como resultado una conexión rechazada
+
+[](./assets/8080-refused.PNG)
+
 
 ### Consigna 2
 
 ¿Qué hace exactamente la regla `ct state established,related accept` y por qué es lo que convierte a este firewall en **stateful**? Relacionalo con la diapositiva de tipos de firewall.
 
-TODO
+Esta regla hace un análisis del estado del paquete y revisa si está *establecida* como conexión existente, o si está *relacionada* a otra conexión existente. Por analizar el estado, es que se considera un firewall **stateful**.
+
+En la diapositiva de tipos de firewall por capa, se mencionan tres tipos: Filtrado de paquetes, inspección de estado y aplicación/proxy.
+El nuestro pertenece al segundo tipo, el cual analiza la capa 3 y 4 del modelo TCP/IP (se fija tanto en las direcciones IP (capa 3) como en los puertos (capa 4)).
+
 
 ### Consigna 3
 
 Explicá cómo esta configuración aplica el principio de **default deny / menor privilegio**.
 
-TODO
+Con la primera regla de la cadena, estamos estableciendo que todos los paquetes se deben rechazar salvo que haya una condición que se lo permita. Esto es un modelo de "lista blanca" y es lo más recomendado en los estándares actuales.
 
 ---
 
