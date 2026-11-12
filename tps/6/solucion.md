@@ -103,24 +103,33 @@ La firma se calcula sobre el **hash del documento**; al cambiar una palabra camb
 
 ## Parte C — Cifrar para un destinatario
 
+*Intercambiá claves públicas con un compañero (o generá una segunda clave de prueba).*
+
 ```bash
 gpg --import compa_publica.asc
 gpg --armor --encrypt --recipient "Nombre del Compa" acta.txt
 gpg --decrypt acta.txt.asc
 ```
 
+Generé una clave a nombre de Franco Soler (una demostración en vivo de por qué esto no tiene validez legal sin certificado!)
+
+![alt text](./assets/gpg-franco.png)
+
+Sin embargo, no ocurrió lo que espera la consigna. Al haber creado yo el par de claves, también tengo la clave privada a disposición.
+
+![alt text](./assets/gpg-decrypt-exitoso.png)
+
+Pero haremos de cuenta que esto no pasó, que realmente recibí una clave pública de Franco para responder lo siguiente.
+
 ### Consigna C
 
 *Explicá por qué vos, que cifraste el archivo, no podés descifrarlo con tu propia clave.
 ¿Con qué clave se cifró y con cuál se descifra?*
 
-Puntos a explicar:
 
 - El archivo se cifró con la **clave pública del destinatario**. [7][8]
-- Solo se descifra con la **clave privada del destinatario**, que vos no tenés. [7][8]
-- Tu clave privada no sirve porque el mensaje no fue cifrado para tu par de claves:
-  la criptografía asimétrica garantiza que únicamente el destinatario pueda abrirlo
-  (confidencialidad). [7][8]
+- Solo se descifra con la **clave privada del destinatario**, que no tengo. [7][8]
+- Mi clave privada no sirve porque el mensaje no fue cifrado para tu par de claves: la criptografía asimétrica garantiza que únicamente el destinatario pueda abrirlo (confidencialidad). [7][8]
 
 ---
 
