@@ -24,11 +24,11 @@ La técnica de AEAD no es compatible con la API de consola de openssl. Esto se e
 
 Por lo tanto, en lugar de usar `-aes-256-gcm`, usaremos `-aes-256-cbc`, que no utiliza técnicas AEAD, pero sirve para continuar con la consigna.
 
-- Salida de `cat mensaje.enc` (contenido binario ilegible): `TODO`
+- Salida de `cat mensaje.enc` (contenido binario ilegible): 
 
 ![alt text](./assets/crypted.png)
 
-- Salida de `cat descifrado.txt` (debe coincidir con el original): `TODO`
+- Salida de `cat descifrado.txt` (debe coincidir con el original): 
 
 ![alt text](./assets/decrypted.png)
 
@@ -71,13 +71,17 @@ gpg --verify acta.txt.asc acta.txt
 *Mostrá la verificación exitosa de la firma. Después modificá `acta.txt` y volvé a
 verificar: ¿qué pasa y por qué?*
 
-- Verificación exitosa (pegar salida de `gpg --verify`): `TODO`
-- Modificación de `acta.txt` (p. ej. cambiar "Acta" por "Acto"): `TODO`
-- Segunda verificación (pegar salida con `BAD signature`): `TODO`
+- Verificación exitosa (pegar salida de `gpg --verify`):
 
-Explicar: la firma se calcula sobre el **hash del documento**; al cambiar una palabra
-cambia el hash, por lo que la firma deja de corresponder y GnuPG informa
-`BAD signature`. [7][8]
+![alt text](gpg-success.png)
+
+- Modificación de `acta.txt`:
+
+Modifiqué el texto de acta.txt para que diga "Clase 7" en vez de 6, y obtuve el siguiente mensaje
+
+![alt text](image.png)
+
+La firma se calcula sobre el **hash del documento**; al cambiar una palabra cambia el hash, por lo que la firma deja de corresponder y GnuPG informa `BAD signature`. [7][8]
 
 ### Consigna B2
 
@@ -85,9 +89,7 @@ cambia el hash, por lo que la firma deja de corresponder y GnuPG informa
 
 - Se **firma con la clave privada** del firmante. [7][8]
 - Se **verifica con la clave pública** del firmante. [7][8]
-- Esto invierte el uso del cifrado asimétrico: lo que se cifra con una clave se
-  descifra con la otra; en la firma, cualquiera con la pública puede comprobar que
-  solo el dueño de la privada pudo firmar. [7][8]
+- Esto invierte el uso del cifrado asimétrico: lo que se cifra con una clave se descifra con la otra; en la firma, cualquiera con la pública puede comprobar que solo el dueño de la privada pudo firmar. [7][8]
 
 ### Consigna B3
 
@@ -95,8 +97,7 @@ cambia el hash, por lo que la firma deja de corresponder y GnuPG informa
 
 - **Autenticidad**: confirma la identidad del firmante (solo él tiene la privada). [7]
 - **Integridad**: detecta cualquier cambio en el documento firmado. [7]
-- **No repudio**: el firmante no puede negar haber firmado, porque solo él posee la
-  clave privada. [7]
+- **No repudio**: el firmante no puede negar haber firmado, porque solo él posee la clave privada. (legalmente, se requiere un certificado digital expedido por un certificante licenciado para que esto sea del todo cierto en Argentina) [7]
 
 ---
 
