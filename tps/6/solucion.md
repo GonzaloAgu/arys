@@ -20,17 +20,17 @@ echo -n "Catedra" | sha256sum
 
 La técnica de AEAD no es compatible con la API de consola de openssl. Esto se evidencia en la siguiente captura.
 
-![alt text](./assets/error.png)
+![](./assets/error.png)
 
 Por lo tanto, en lugar de usar `-aes-256-gcm`, usaremos `-aes-256-cbc`, que no utiliza técnicas AEAD, pero sirve para continuar con la consigna.
 
 - Salida de `cat mensaje.enc` (contenido binario ilegible): 
 
-![alt text](./assets/crypted.png)
+![](./assets/crypted.png)
 
 - Salida de `cat descifrado.txt` (debe coincidir con el original): 
 
-![alt text](./assets/decrypted.png)
+![](./assets/decrypted.png)
 
 El cifrado simétrico usa **la misma clave** (derivada de la passphrase
 mediante PBKDF2) para cifrar y descifrar; sin esa passphrase el archivo no se puede
@@ -41,7 +41,7 @@ leer. [1][2]
 *Compará los dos hashes SHA-256: cambiar una sola letra, ¿cuánto cambia el resultado?
 ¿Cómo se relaciona esto con la detección de integridad?*
 
-![alt text](./assets/sha.png)
+![](./assets/sha.png)
 
 
 - El resultado cambia **casi por completo**: es el **efecto avalancha**, propiedad de las funciones de hash criptográficas (un cambio mínimo en la entrada produce una salida totalmente distinta e impredecible). [3][4]
@@ -73,13 +73,13 @@ verificar: ¿qué pasa y por qué?*
 
 - Verificación exitosa (pegar salida de `gpg --verify`):
 
-![alt text](gpg-success.png)
+![](./assets/gpg-success.png)
 
 - Modificación de `acta.txt`:
 
 Modifiqué el texto de acta.txt para que diga "Clase 7" en vez de 6, y obtuve el siguiente mensaje
 
-![alt text](image.png)
+![](./assets/gpg-bad.png)
 
 La firma se calcula sobre el **hash del documento**; al cambiar una palabra cambia el hash, por lo que la firma deja de corresponder y GnuPG informa `BAD signature`. [7][8]
 
@@ -113,11 +113,11 @@ gpg --decrypt acta.txt.asc
 
 Generé una clave a nombre de Franco Soler (una demostración en vivo de por qué esto no tiene validez legal sin certificado!)
 
-![alt text](./assets/gpg-franco.png)
+![](./assets/gpg-franco.png)
 
 Sin embargo, no ocurrió lo que espera la consigna. Al haber creado yo el par de claves, también tengo la clave privada a disposición.
 
-![alt text](./assets/gpg-decrypt-exitoso.png)
+![](./assets/gpg-decrypt-exitoso.png)
 
 Pero haremos de cuenta que esto no pasó, que realmente recibí una clave pública de Franco para responder lo siguiente.
 
@@ -142,28 +142,43 @@ openssl s_client -connect www.unp.edu.ar:443 -servername www.unp.edu.ar </dev/nu
 echo | openssl s_client -connect www.unp.edu.ar:443 -showcerts 2>/dev/null | grep -E "s:|i:"
 ```
 
+**Información obtenida del certificado**
+```bash
+issuer=C = US, O = Let's Encrypt, CN = YE2
+subject=CN = www.unp.edu.ar
+notBefore=Sep  5 02:01:08 2026 GMT
+notAfter=Dec  4 02:01:07 2026 GMT
+```
+
+**Cadena completa**
+```bash
+ 0 s:CN = www.unp.edu.ar
+   i:C = US, O = Let's Encrypt, CN = YE2
+ 1 s:C = US, O = Let's Encrypt, CN = YE2
+   i:C = US, O = ISRG, CN = Root YE
+ 2 s:C = US, O = ISRG, CN = Root YE
+   i:C = US, O = Internet Security Research Group, CN = ISRG Root X2
+ 3 s:C = US, O = Internet Security Research Group, CN = ISRG Root X2
+   i:C = US, O = Internet Security Research Group, CN = ISRG Root X1
+```
+
 ### Consigna D1
 
 *¿Quién emitió el certificado (issuer) y para quién (subject)? ¿Cuál es su período de
 validez?*
 
-- Issuer: `TODO`
-- Subject: `TODO`
-- `notBefore` / `notAfter`: `TODO`
+- Issuer: Let's Encrypt
+- Subject: www.unp.edu.ar
+- Periodo de validez
+    - `notBefore`: 5 de septiembre de 2026 a las 02:01:08 GMT
+    - `notAfter`: 4 de diciembre de 2026 a las 02:01:07 2026 GMT
 
-<!-- Pegar la salida real de openssl x509. -->
 
 ### Consigna D2
 
 *Identificá la cadena de confianza (servidor → intermedia → raíz).*
 
-Puntos a explicar:
-
-- El certificado del servidor lo emite una **CA intermedia**, que a su vez fue
-  firmada por una **CA raíz** de confianza. [9][10]
-- Cadena observada (pegar salida de `-showcerts` y marcar los `i:`/`s:`): `TODO`
-- Cada eslabón está firmado por el anterior; la raíz es el ancla de confianza
-  (*trust anchor*). [9][10]
+![](./assets/pki-diagrama.png)
 
 ### Consigna D3
 
@@ -173,10 +188,8 @@ Puntos a explicar:
 
 - Porque el navegador/sistema operativo trae una **lista de CA raíz de confianza**
   preinstalada. [9][10]
-- Al validar la cadena hasta una de esas raíces, y comprobar firma, nombre del sitio
-  (SAN) y vigencia, el certificado queda validado. [9][10]
-- La confianza no está en el certificado en sí, sino en la **PKI** y en las CA que
-  actúan como terceros de confianza. [9][10]
+- Al validar la cadena hasta una de esas raíces, y comprobar firma, nombre del sitio (SAN) y vigencia, el certificado queda validado. [9][10]
+- La confianza no está en el certificado en sí, sino en la **PKI** y en las CA que actúan como terceros de confianza. [9][10]
 
 ---
 

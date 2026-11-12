@@ -9,8 +9,8 @@ Salida por defecto: PDF (HTML estilizado con CSS + Chrome headless).
 Con `--docx`: archivo .docx clásico.
 
 Uso:
-    python tps/build_tp.py <numero>          # genera tps/N/trabajo_practico.pdf
-    python tps/build_tp.py <numero> --docx   # genera tps/N/trabajo_practico.docx
+    python tps/build_tp.py <numero>          # genera tps/N/TPx_GonzaloAgu.pdf
+    python tps/build_tp.py <numero> --docx   # genera tps/N/TPx_GonzaloAgu.docx
 
 Requiere pandoc en el PATH (https://pandoc.org/installing.html).
 Para PDF se usa Chrome o Edge (headless); en el primer uso del DOCX se genera
@@ -283,7 +283,7 @@ def build_docx(tp_dir: Path, tp_number: int, titulo: str, solucion: Path):
     cover = render_cover_docx(titulo)
     body = solucion.read_text(encoding="utf-8")
 
-    output = tp_dir / "trabajo_practico.docx"
+    output = tp_dir / f"TP{tp_number}_GonzaloAgu.docx"
     cmd = [
         "pandoc",
         "-f", "markdown+raw_attribute",
@@ -303,7 +303,7 @@ def build_docx(tp_dir: Path, tp_number: int, titulo: str, solucion: Path):
     return output
 
 
-def build_pdf(tp_dir: Path, titulo: str, solucion: Path):
+def build_pdf(tp_dir: Path, tp_number: int, titulo: str, solucion: Path):
     chrome = find_chromium()
     if chrome is None:
         print("Error: no se encontró Chrome ni Edge para generar el PDF.", file=sys.stderr)
@@ -315,7 +315,7 @@ def build_pdf(tp_dir: Path, titulo: str, solucion: Path):
     body = solucion.read_text(encoding="utf-8")
     combined = (cover + "\n\n" + body).encode("utf-8")
 
-    output = tp_dir / "trabajo_practico.pdf"
+    output = tp_dir / f"TP{tp_number}_GonzaloAgu.pdf"
     with tempfile.TemporaryDirectory(prefix="tp_build_") as tmp:
         tmp = Path(tmp)
         html = tmp / "documento.html"
@@ -377,7 +377,7 @@ def build_tp(tp_number: int, fmt: str):
     if fmt == "docx":
         build_docx(tp_dir, tp_number, titulo, solucion)
     else:
-        build_pdf(tp_dir, titulo, solucion)
+        build_pdf(tp_dir, tp_number, titulo, solucion)
 
 
 if __name__ == "__main__":
