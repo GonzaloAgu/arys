@@ -1,0 +1,7 @@
+{
+  "pasteImage.path": "${currentFileDir}/assets",
+  "pasteImage.basePath": "${currentFileDir}",
+  "pasteImage.defaultName": "${currentFileNameWithoutExt}-YYYY-MM-DD-HH-mm-ss",
+  "pasteImage.namePrefix": "captura-",
+  "pasteImage.insertPattern": "![${imageFileNameWithoutExt}](${imageFilePath})"
+}
