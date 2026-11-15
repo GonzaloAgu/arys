@@ -1,0 +1,105 @@
+name: tps8-lab
+
+networks:
+  labnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  syslog-data:
+  certs:
+
+services:
+  snmp-agent:
+    build: ./snmp
+    profiles: ["snmp"]
+    hostname: snmp-agent
+    networks: [labnet]
+    command: ["snmpd", "-f", "-Lo", "-C", "-c", "/etc/snmp/snmpd.conf"]
+    restart: unless-stopped
+
+  snmp-client:
+    build: ./snmp
+    profiles: ["snmp"]
+    hostname: snmp-client
+    networks: [labnet]
+    depends_on: [snmp-agent]
+    command: ["sleep", "infinity"]
+    cap_add: [NET_RAW, NET_ADMIN]
+    volumes:
+      - ./captures:/captures
+      - ./scripts:/scripts:ro
+    restart: unless-stopped
+
+  syslog-server:
+    build: ./syslog
+    profiles: ["syslog"]
+    hostname: syslog-server
+    networks: [labnet]
+    command: ["rsyslogd", "-n"]
+    volumes:
+      - syslog-data:/var/log/remote
+      - ./syslog/rsyslog-server.conf:/etc/rsyslog.d/10-lab.conf:ro
+    ports:
+      - "127.0.0.1:${HOST_SYSLOG_PORT:-5514}:514/udp"
+    restart: unless-stopped
+
+  syslog-client:
+    build: ./syslog
+    profiles: ["syslog"]
+    hostname: syslog-client
+    networks: [labnet]
+    depends_on: [syslog-server]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    profiles: ["obs"]
+    hostname: prometheus
+    networks: [labnet]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${HOST_PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    profiles: ["obs"]
+    hostname: grafana
+    networks: [labnet]
+    depends_on: [prometheus]
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${HOST_GRAFANA_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    profiles: ["obs"]
+    hostname: node-exporter
+    networks: [labnet]
+    restart: unless-stopped
+
+  snmp-exporter:
+    image: prom/snmp-exporter:v0.26.0
+    profiles: ["obs-snmp"]
+    hostname: snmp-exporter
+    networks: [labnet]
+    volumes:
+      - ./snmp-exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
+    restart: unless-stopped

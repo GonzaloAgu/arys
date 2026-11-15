@@ -4,3 +4,8 @@
 integrity/manifest.sha256  text eol=lf
 .githooks/pre-commit       text eol=lf
 tools/integrity/**/*.ps1    text eol=lf
+tps/8/lab/**/*.yaml         text eol=lf
+tps/8/lab/**/*.yml          text eol=lf
+tps/8/lab/**/*.conf         text eol=lf
+tps/8/lab/**/*.sh           text eol=lf
+tps/8/lab/**/Dockerfile     text eol=lf

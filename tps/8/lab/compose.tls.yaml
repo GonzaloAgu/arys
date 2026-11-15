@@ -1,0 +1,43 @@
+services:
+  certgen:
+    image: alpine/openssl:3.3.1
+    profiles: ["syslog-tls"]
+    networks: [labnet]
+    entrypoint: ["/bin/sh", "/tls/generate-certs.sh"]
+    volumes:
+      - certs:/certs
+      - ./tls:/tls:ro
+    restart: "no"
+
+  syslog-server-tls:
+    build: ./syslog
+    profiles: ["syslog-tls"]
+    hostname: syslog-server-tls
+    networks: [labnet]
+    command: ["rsyslogd", "-n"]
+    volumes:
+      - syslog-data:/var/log/remote
+      - ./syslog/rsyslog-server-tls.conf:/etc/rsyslog.d/10-lab-tls.conf:ro
+      - certs:/etc/rsyslog-certs:ro
+    ports:
+      - "127.0.0.1:${HOST_SYSLOG_TLS_PORT:-6514}:6514"
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  syslog-client-tls:
+    build: ./syslog
+    profiles: ["syslog-tls"]
+    hostname: syslog-client-tls
+    networks: [labnet]
+    command: ["rsyslogd", "-n"]
+    volumes:
+      - ./syslog/rsyslog-client-tls.conf:/etc/rsyslog.d/10-forward.conf:ro
+      - certs:/etc/rsyslog-certs:ro
+    depends_on:
+      certgen:
+        condition: service_completed_successfully
+      syslog-server-tls:
+        condition: service_started
+    restart: unless-stopped
