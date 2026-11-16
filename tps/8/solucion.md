@@ -121,7 +121,9 @@ docker compose --profile obs --profile snmp --profile obs-snmp up -d --build
 
 *Mostrá la métrica `up` en Prometheus. ¿Qué representa?*
 
-[](./assets/captura-solucion-2026-11-16-20-11-20.png)
+![](./assets/captura-solucion-2026-11-16-20-11-20.png)
+
+Representa con un "1" si el servicio consultado está activo.
 
 #### Consigna C.2
 
